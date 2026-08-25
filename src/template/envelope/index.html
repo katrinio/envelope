@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ user.username }} · Savings envelopes</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}">
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="page-header">
+        <p class="eyebrow">Long-term savings</p>
+        <h1>{{ user.username }}</h1>
+        <p class="salary">Salary <strong>{{ "{:,}".format(user.salary) }}</strong></p>
+      </header>
+
+      {% if envelope_items %}
+        <section class="envelope-grid" aria-label="Savings envelopes">
+          {% for item in envelope_items %}
+            <article class="envelope-card">
+              <div class="card-heading">
+                <h2>{{ item.envelope.name }}</h2>
+                <span>{{ item.progress_percentage }}%</span>
+              </div>
+
+              <div
+                class="progress-track"
+                role="progressbar"
+                aria-label="{{ item.envelope.name }} progress"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="{{ item.progress_percentage }}"
+              >
+                <span style="width: {{ item.progress_percentage }}%"></span>
+              </div>
+
+              <p class="amounts">
+                <strong>{{ "{:,}".format(item.envelope.current_amount) }}</strong>
+                <span>of {{ "{:,}".format(item.envelope.target_amount) }}</span>
+              </p>
+
+              <form
+                class="amount-form"
+                action="{{ url_for('change_envelope_amount', user_id=user.id, envelope_id=item.envelope.id) }}"
+                method="post"
+              >
+                <label for="amount-{{ item.envelope.id }}">Change saved amount</label>
+                <div class="amount-controls">
+                  <input
+                    id="amount-{{ item.envelope.id }}"
+                    name="amount"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Amount"
+                    required
+                  >
+                  <button name="operation" value="decrement" type="submit" aria-label="Decrease amount">−</button>
+                  <button name="operation" value="increment" type="submit" aria-label="Increase amount">+</button>
+                </div>
+              </form>
+            </article>
+          {% endfor %}
+        </section>
+      {% else %}
+        <section class="empty-state">
+          <h2>No envelopes yet</h2>
+          <p>Your long-term savings envelopes will appear here.</p>
+        </section>
+      {% endif %}
+    </main>
+  </body>
+</html>

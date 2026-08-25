@@ -1,10 +1,13 @@
-from typing import Annotated
+from dataclasses import dataclass
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Form, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.orm.envelope import Envelope
 from src.orm.user import User
+from src.template import templates
 
 router = APIRouter(tags=["envelopes"])
 
@@ -31,11 +34,26 @@ class EnvelopeResponse(BaseModel):
     priority: int
 
 
+@dataclass(frozen=True)
+class EnvelopePageItem:
+    envelope: Envelope
+    progress_percentage: int
+
+
 def _get_envelope_or_404(envelope_id: int) -> Envelope:
     envelope = Envelope.get(envelope_id)
     if envelope is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Envelope not found")
     return envelope
+
+
+def _set_current_amount(envelope: Envelope, current_amount: int) -> Envelope:
+    envelope.current_amount = current_amount
+    return envelope.save()
+
+
+def _calculate_progress_percentage(envelope: Envelope) -> int:
+    return min(round(envelope.current_amount / envelope.target_amount * 100), 100)
 
 
 @router.post(
@@ -65,11 +83,62 @@ def get_envelope(envelope_id: int) -> Envelope:
 @router.patch("/envelopes/{envelope_id}/current-amount", response_model=EnvelopeResponse)
 def update_current_amount(envelope_id: int, payload: EnvelopeCurrentAmountUpdate) -> Envelope:
     envelope = _get_envelope_or_404(envelope_id)
-    envelope.current_amount = payload.current_amount
-    return envelope.save()
+    return _set_current_amount(envelope, payload.current_amount)
 
 
 @router.delete("/envelopes/{envelope_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_envelope(envelope_id: int) -> None:
     envelope = _get_envelope_or_404(envelope_id)
     envelope.delete()
+
+
+@router.get(
+    "/users/{user_id}/envelopes/page",
+    response_class=HTMLResponse,
+    name="view_user_envelopes",
+)
+def view_user_envelopes(request: Request, user_id: int) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    envelope_items = [
+        EnvelopePageItem(
+            envelope=envelope,
+            progress_percentage=_calculate_progress_percentage(envelope),
+        )
+        for envelope in Envelope.for_user(user_id)
+    ]
+    return templates.TemplateResponse(
+        request,
+        "envelope/index.html",
+        {"user": user, "envelope_items": envelope_items},
+    )
+
+
+@router.post(
+    "/users/{user_id}/envelopes/{envelope_id}/amount",
+    response_class=RedirectResponse,
+    name="change_envelope_amount",
+)
+def change_envelope_amount(
+    request: Request,
+    user_id: int,
+    envelope_id: int,
+    amount: Annotated[int, Form(gt=0)],
+    operation: Annotated[Literal["increment", "decrement"], Form()],
+) -> RedirectResponse:
+    envelope = _get_envelope_or_404(envelope_id)
+    if envelope.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Envelope not found")
+
+    delta = amount if operation == "increment" else -amount
+    try:
+        _set_current_amount(envelope, envelope.current_amount + delta)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error))
+
+    return RedirectResponse(
+        request.url_for("view_user_envelopes", user_id=user_id),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )

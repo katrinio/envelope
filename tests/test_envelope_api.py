@@ -87,3 +87,76 @@ def test_create_envelope_for_missing_user(client: TestClient) -> None:
     )
 
     assert response.status_code == 404
+
+
+def test_envelope_page_renders(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "alice" in response.text
+    assert "100,000" in response.text
+
+
+def test_envelope_page_shows_envelope_data(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    envelope = client.post(
+        f"/users/{user.id}/envelopes",
+        json={
+            "name": "Home deposit",
+            "current_amount": 25_000,
+            "target_amount": 100_000,
+            "priority": 1,
+        },
+    ).json()
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert "Home deposit" in response.text
+    assert "25,000" in response.text
+    assert "100,000" in response.text
+    assert f"amount-{envelope['id']}" in response.text
+
+
+def test_envelope_page_progress_calculation(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    client.post(
+        f"/users/{user.id}/envelopes",
+        json={"name": "Education", "current_amount": 250, "target_amount": 1_000, "priority": 1},
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert "25%" in response.text
+    assert 'aria-valuenow="25"' in response.text
+    assert 'style="width: 25%"' in response.text
+
+
+def test_envelope_page_empty_state(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert "No envelopes yet" in response.text
+    assert 'aria-label="Savings envelopes"' not in response.text
+
+
+def test_envelope_page_changes_current_amount(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    envelope = client.post(
+        f"/users/{user.id}/envelopes",
+        json={"name": "Emergency fund", "current_amount": 100, "target_amount": 1_000, "priority": 1},
+    ).json()
+    amount_url = f"/users/{user.id}/envelopes/{envelope['id']}/amount"
+
+    increment_response = client.post(amount_url, data={"amount": 50, "operation": "increment"})
+    assert increment_response.status_code == 200
+    assert client.get(f"/envelopes/{envelope['id']}").json()["current_amount"] == 150
+
+    decrement_response = client.post(amount_url, data={"amount": 25, "operation": "decrement"})
+    assert decrement_response.status_code == 200
+    assert client.get(f"/envelopes/{envelope['id']}").json()["current_amount"] == 125

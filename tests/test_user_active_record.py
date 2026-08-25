@@ -1,8 +1,29 @@
+import subprocess
+import sys
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src import database
 from src.orm.user import User
+
+
+def test_direct_user_import_registers_envelope_mapper() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from src.orm.user import User; "
+                'User(userId=1, username="mapper-check", salary=1)'
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_user_active_record(tmp_path, monkeypatch) -> None:
