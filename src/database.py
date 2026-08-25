@@ -2,9 +2,15 @@ import os
 from pathlib import Path
 from typing import Any, Self
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, sessionmaker
+
+
+def _enable_sqlite_foreign_keys(dbapi_connection: Any, _connection_record: Any) -> None:
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 def _create_engine(database_url: str) -> Engine:
@@ -15,7 +21,10 @@ def _create_engine(database_url: str) -> Engine:
         Path(database_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
 
     connect_args = {"check_same_thread": False} if url.drivername.startswith("sqlite") else {}
-    return create_engine(url, connect_args=connect_args, pool_pre_ping=True)
+    created_engine = create_engine(url, connect_args=connect_args, pool_pre_ping=True)
+    if url.drivername.startswith("sqlite"):
+        event.listen(created_engine, "connect", _enable_sqlite_foreign_keys)
+    return created_engine
 
 
 database_url = os.getenv("DATABASE_URL", "sqlite:///data/app.db")
@@ -57,7 +66,7 @@ class Base(DeclarativeBase):
 
 def init_database() -> None:
     # Import models before create_all so that they are registered in Base.metadata.
-    from src.orm import user  # noqa: F401
+    from src.orm import envelope, user  # noqa: F401
 
     Base.metadata.create_all(engine)
 

@@ -12,7 +12,7 @@ def test_user_active_record(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(database, "SessionLocal", test_session)
     database.init_database()
 
-    user = User.create(username="alice", salary=100_000)
+    user = User.create(userId=1, username="alice", salary=100_000)
 
     assert user.id is not None
     assert User.get(user.id).username == "alice"

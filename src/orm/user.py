@@ -1,7 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
+
+if TYPE_CHECKING:
+    from src.orm.envelope import Envelope
 
 
 class User(Base):
@@ -11,3 +18,7 @@ class User(Base):
     userId: Mapped[int] = mapped_column(Integer, unique=True)
     username: Mapped[str] = mapped_column(String(255), unique=True)
     salary: Mapped[int] = mapped_column(Integer)
+    envelopes: Mapped[list[Envelope]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
