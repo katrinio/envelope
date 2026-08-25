@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, select, true
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, select
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from src import database
@@ -26,7 +26,6 @@ class Envelope(Base):
     current_amount: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     target_amount: Mapped[int] = mapped_column(Integer)
     priority: Mapped[int] = mapped_column(Integer)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
 
     user: Mapped[User] = relationship(back_populates="envelopes")
 
@@ -53,7 +52,3 @@ class Envelope(Base):
         with database.SessionLocal() as session:
             query = select(cls).where(cls.user_id == user_id).order_by(cls.priority, cls.id)
             return list(session.scalars(query).all())
-
-    def deactivate(self) -> None:
-        self.is_active = False
-        self.save()

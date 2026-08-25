@@ -33,7 +33,6 @@ def test_envelope_crud(client: TestClient) -> None:
     assert create_response.status_code == 201
     envelope = create_response.json()
     assert envelope["current_amount"] == 0
-    assert envelope["is_active"] is True
 
     list_response = client.get(f"/users/{user.id}/envelopes")
     assert list_response.status_code == 200
@@ -56,7 +55,13 @@ def test_envelope_crud(client: TestClient) -> None:
 
     delete_response = client.delete(f"/envelopes/{envelope['id']}")
     assert delete_response.status_code == 204
-    assert client.get(f"/envelopes/{envelope['id']}").json()["is_active"] is False
+
+    get_deleted_response = client.get(f"/envelopes/{envelope['id']}")
+    assert get_deleted_response.status_code == 404
+
+    list_after_delete_response = client.get(f"/users/{user.id}/envelopes")
+    assert list_after_delete_response.status_code == 200
+    assert list_after_delete_response.json() == []
 
 
 @pytest.mark.parametrize(

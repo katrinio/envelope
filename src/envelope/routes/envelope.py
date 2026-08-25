@@ -29,7 +29,6 @@ class EnvelopeResponse(BaseModel):
     current_amount: int
     target_amount: int
     priority: int
-    is_active: bool
 
 
 def _get_envelope_or_404(envelope_id: int) -> Envelope:
@@ -71,6 +70,6 @@ def update_current_amount(envelope_id: int, payload: EnvelopeCurrentAmountUpdate
 
 
 @router.delete("/envelopes/{envelope_id}", status_code=status.HTTP_204_NO_CONTENT)
-def deactivate_envelope(envelope_id: int) -> None:
+def delete_envelope(envelope_id: int) -> None:
     envelope = _get_envelope_or_404(envelope_id)
-    envelope.deactivate()
+    envelope.delete()
