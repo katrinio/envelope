@@ -132,7 +132,8 @@ def test_envelope_page_progress_calculation(client: TestClient) -> None:
 
     assert "25%" in response.text
     assert 'aria-valuenow="25"' in response.text
-    assert 'style="width: 25%"' in response.text
+    assert 'data-progress="25"' in response.text
+    assert response.text.count('class="progress-segment is-filled"') == 2
 
 
 def test_envelope_page_empty_state(client: TestClient) -> None:

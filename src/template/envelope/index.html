@@ -24,14 +24,20 @@
               </div>
 
               <div
-                class="progress-track"
+                class="progress-segments"
                 role="progressbar"
                 aria-label="{{ item.envelope.name }} progress"
                 aria-valuemin="0"
                 aria-valuemax="100"
                 aria-valuenow="{{ item.progress_percentage }}"
+                data-progress="{{ item.progress_percentage }}"
               >
-                <span style="width: {{ item.progress_percentage }}%"></span>
+                {% for segment in range(1, 11) %}
+                  <span
+                    class="progress-segment{% if item.progress_percentage >= segment * 10 %} is-filled{% endif %}"
+                    aria-hidden="true"
+                  ></span>
+                {% endfor %}
               </div>
 
               <p class="amounts">

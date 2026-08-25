@@ -69,8 +69,8 @@ h1 {
 
 .envelope-card,
 .empty-state {
-  border: 1px solid #d7d7d2;
-  border-radius: 1rem;
+  border: 1px solid #242424;
+  border-radius: 0.45rem;
   background: #fff;
   padding: 1.5rem;
 }
@@ -85,27 +85,34 @@ h1 {
 .card-heading h2,
 .empty-state h2 {
   margin-bottom: 0;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 1.1rem;
   font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .card-heading span {
   color: #666;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.85rem;
 }
 
-.progress-track {
-  height: 0.55rem;
+.progress-segments {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 0.3rem;
   margin: 1.5rem 0 0.8rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e7e7e3;
 }
 
-.progress-track span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
+.progress-segment {
+  height: 0.65rem;
+  border: 1px solid #777;
+  background: #fff;
+}
+
+.progress-segment.is-filled {
+  border-color: #222;
   background: #222;
 }
 
@@ -144,7 +151,7 @@ h1 {
   min-width: 0;
   height: 2.6rem;
   border: 1px solid #cececa;
-  border-radius: 0.6rem;
+  border-radius: 0.3rem;
   background: #fafaf8;
 }
 
