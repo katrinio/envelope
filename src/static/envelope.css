@@ -744,6 +744,87 @@ h1 {
   text-transform: none;
 }
 
+.delete-dialog {
+  width: min(18rem, calc(100vw - 2rem));
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  color: var(--primary-text);
+  background: var(--device-background);
+  padding: 0;
+}
+
+.delete-dialog::backdrop {
+  background: rgb(42 41 37 / 18%);
+}
+
+.delete-dialog-content {
+  padding: 0.9rem;
+}
+
+.delete-dialog-title {
+  margin: 0 0 0.55rem;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.delete-dialog-message {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.delete-dialog-error {
+  margin: 0.4rem 0 0;
+  color: var(--secondary-text);
+  font-size: 0.6rem;
+}
+
+.delete-dialog-error[hidden] {
+  display: none;
+}
+
+.delete-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-top: 0.8rem;
+}
+
+.delete-dialog-actions button {
+  border: 0;
+  color: var(--secondary-text);
+  background: transparent;
+  padding: 0.25rem 0.35rem;
+  cursor: pointer;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.55rem;
+  text-transform: uppercase;
+}
+
+.delete-dialog-actions [data-delete-confirm] {
+  border: 1px solid var(--border);
+  color: var(--primary-text);
+}
+
+.delete-dialog-actions button:hover,
+.delete-dialog-actions button:focus-visible {
+  color: var(--primary-text);
+  background: var(--control-background);
+}
+
+.delete-dialog-actions button:focus-visible {
+  outline: 1px solid var(--primary-text);
+  outline-offset: 2px;
+}
+
+.delete-dialog-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .progress-segments {
   display: grid;
   grid-template-columns: repeat(10, 1fr);

@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=salary-editor-2">
-    <script src="{{ url_for('static', path='/envelope.js') }}?v=salary-editor-1" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=envelope-delete-dialog-1">
+    <script src="{{ url_for('static', path='/envelope.js') }}?v=envelope-delete-dialog-1" defer></script>
   </head>
   <body>
     <main class="page-shell">
@@ -172,7 +172,6 @@
                       >
                         Delete
                       </button>
-                      <p class="device-menu-error" role="status" hidden>Try again.</p>
                     </div>
                   </div>
                 </div>
@@ -353,5 +352,24 @@
         </details>
       </section>
     </main>
+
+    <dialog
+      class="delete-dialog"
+      data-delete-dialog
+      aria-labelledby="delete-dialog-title"
+      aria-describedby="delete-dialog-message"
+    >
+      <div class="delete-dialog-content">
+        <p class="delete-dialog-title" id="delete-dialog-title">Delete envelope</p>
+        <p class="delete-dialog-message" id="delete-dialog-message">
+          Permanently delete this envelope? This action cannot be undone.
+        </p>
+        <p class="delete-dialog-error" role="status" hidden>Try again.</p>
+        <div class="delete-dialog-actions">
+          <button type="button" data-delete-cancel>Cancel</button>
+          <button type="button" data-delete-confirm>Delete</button>
+        </div>
+      </div>
+    </dialog>
   </body>
 </html>

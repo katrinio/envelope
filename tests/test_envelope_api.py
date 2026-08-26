@@ -515,10 +515,17 @@ def test_envelope_edit_menu_is_rendered(client: TestClient) -> None:
     assert "Delete" in response.text
     assert f"?edit_envelope_id={envelope.id}" in response.text
     assert f'data-delete-url="http://testserver/envelopes/{envelope.id}"' in response.text
+    assert "Permanently delete this envelope? This action cannot be undone." in response.text
+    assert "real money" not in response.text.lower()
+    assert "data-delete-dialog" in response.text
+    assert "data-delete-confirm" in response.text
+    assert "data-delete-cancel" in response.text
     assert '<details class="device-menu"' not in response.text
 
     script_response = client.get("/static/envelope.js")
     assert script_response.status_code == 200
+    assert "real money" not in script_response.text.lower()
+    assert "deleteDialog.showModal()" in script_response.text
     assert 'method: "DELETE"' in script_response.text
 
 
@@ -794,7 +801,7 @@ def test_salary_is_rendered_as_inline_editor_in_header(client: TestClient) -> No
     assert 'class="salary-form"' in response.text
     assert 'value="100000"' in response.text
     assert "hidden" in response.text
-    assert "/static/envelope.js?v=salary-editor-1" in response.text
+    assert "/static/envelope.js?v=envelope-delete-dialog-1" in response.text
 
 
 def test_salary_can_be_updated(client: TestClient) -> None:
