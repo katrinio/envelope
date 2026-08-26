@@ -50,6 +50,10 @@ input {
 .creation-trigger,
 .creation-title,
 .creation-field label,
+.creation-field .field-label,
+.pillow-option,
+.pillow-goal p,
+.calculated-goal,
 .creation-actions {
   font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   letter-spacing: 0.06em;
@@ -195,6 +199,15 @@ h1 {
   text-transform: uppercase;
 }
 
+.creation-field .field-label {
+  display: block;
+  margin-bottom: 0.28rem;
+  color: var(--secondary-text);
+  font-size: 0.57rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .creation-field input {
   width: 100%;
   height: 1.8rem;
@@ -220,6 +233,100 @@ h1 {
 .goal-entry span {
   color: var(--secondary-text);
   font-size: 0.75rem;
+}
+
+.pillow-option {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.05rem 0 0.65rem;
+  color: var(--primary-text);
+  font-size: 0.57rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pillow-toggle {
+  width: 0.8rem;
+  height: 0.8rem;
+  margin: 0;
+  accent-color: var(--segment-fill);
+}
+
+.pillow-toggle:disabled,
+.pillow-toggle:disabled + label {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.info-tip {
+  position: relative;
+  color: var(--secondary-text);
+  cursor: help;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.info-tooltip {
+  position: absolute;
+  z-index: 2;
+  bottom: calc(100% + 0.4rem);
+  right: 0;
+  display: none;
+  width: 11.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.15rem;
+  color: var(--primary-text);
+  background: var(--page-background);
+  padding: 0.45rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+.info-tip:hover .info-tooltip,
+.info-tip:focus .info-tooltip {
+  display: block;
+}
+
+.option-note {
+  margin: -0.35rem 0 0.6rem 1.15rem;
+  color: var(--secondary-text);
+  font-size: 0.58rem;
+  line-height: 1.3;
+}
+
+.pillow-goal {
+  display: none;
+}
+
+.creation-form:has(.pillow-toggle:checked) .regular-goal {
+  display: none;
+}
+
+.creation-form:has(.pillow-toggle:checked) .pillow-goal {
+  display: block;
+}
+
+.pillow-goal output {
+  display: block;
+  color: var(--primary-text);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.pillow-goal p,
+.calculated-goal {
+  margin: 0.18rem 0 0;
+  color: var(--secondary-text);
+  font-size: 0.55rem;
+  letter-spacing: 0.03em;
 }
 
 .field-error {
@@ -262,6 +369,8 @@ h1 {
 }
 
 .creation-field input:focus-visible,
+.pillow-toggle:focus-visible,
+.info-tip:focus-visible,
 .creation-actions a:focus-visible,
 .creation-actions button:focus-visible {
   outline: 2px solid var(--primary-text);
@@ -334,6 +443,10 @@ h1 {
 .amounts span {
   color: var(--secondary-text);
   font-size: 0.72rem;
+}
+
+.calculated-goal {
+  margin: -0.25rem 0 0.45rem;
 }
 
 .device-status {
