@@ -120,7 +120,7 @@ def view_user_envelopes(request: Request, user_id: int) -> Response:
             EnvelopePageItem(
                 envelope=envelope,
                 progress_percentage=progress_percentage,
-                filled_segments=round(progress_percentage / 5),
+                filled_segments=progress_percentage // 10,
                 status_message=_envelope_status(envelope, progress_percentage),
             )
         )

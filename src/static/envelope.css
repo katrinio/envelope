@@ -1,6 +1,16 @@
 :root {
-  color: #1b1c18;
-  background: #ebe7d9;
+  --page-background: #f1eee4;
+  --device-background: #e7e2d7;
+  --display-background: #f7f3e9;
+  --control-background: #fbf8f1;
+  --primary-text: #272725;
+  --secondary-text: #706c64;
+  --border: #5c5953;
+  --display-border: #8a857c;
+  --segment-fill: #383835;
+
+  color: var(--primary-text);
+  background: var(--page-background);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
 }
@@ -12,7 +22,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #ebe7d9;
+  background: var(--page-background);
 }
 
 button,
@@ -30,7 +40,7 @@ input {
   max-width: 34rem;
   margin-bottom: 2rem;
   padding-bottom: 0.8rem;
-  border-bottom: 1px solid #32332d;
+  border-bottom: 1px solid var(--border);
 }
 
 .eyebrow,
@@ -44,7 +54,7 @@ input {
 
 .eyebrow {
   margin: 0 0 0.55rem;
-  color: #65665d;
+  color: var(--secondary-text);
   font-size: 0.64rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -72,13 +82,13 @@ h1 {
 
 .salary {
   margin: 0;
-  color: #292a25;
+  color: var(--primary-text);
   font-size: 0.78rem;
 }
 
 .salary span {
   margin-right: 0.3rem;
-  color: #707168;
+  color: var(--secondary-text);
   font-size: 0.58rem;
   text-transform: uppercase;
 }
@@ -93,17 +103,17 @@ h1 {
 .envelope-device {
   width: 15.5rem;
   min-height: 13.25rem;
-  border: 1px solid #292a25;
-  border-radius: 0.55rem;
-  background: #dedbcc;
-  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--device-background);
+  padding: 0.6rem 0.6rem 0.7rem;
 }
 
 .device-screen {
-  border: 1px solid #55564f;
-  border-radius: 0.2rem;
-  background: #d0d2b9;
-  padding: 0.8rem;
+  border: 1px solid var(--display-border);
+  border-radius: 0.16rem;
+  background: var(--display-background);
+  padding: 0.8rem 0.75rem 0.75rem;
 }
 
 .device-heading {
@@ -125,27 +135,27 @@ h1 {
 
 .percentage {
   flex: none;
-  color: #34352f;
+  color: var(--primary-text);
   font-size: 0.68rem;
   font-weight: 700;
 }
 
 .progress-segments {
   display: grid;
-  grid-template-columns: repeat(20, 1fr);
-  gap: 0.14rem;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 0.28rem;
   margin: 1.15rem 0 0.8rem;
 }
 
 .progress-segment {
-  height: 0.72rem;
-  border: 1px solid #5f6156;
+  height: 0.74rem;
+  border: 1px solid var(--border);
   background: transparent;
 }
 
 .progress-segment.is-filled {
-  border-color: #20211d;
-  background: #20211d;
+  border-color: var(--segment-fill);
+  background: var(--segment-fill);
 }
 
 .amounts {
@@ -163,14 +173,14 @@ h1 {
 }
 
 .amounts span {
-  color: #5e6056;
+  color: var(--secondary-text);
   font-size: 0.72rem;
 }
 
 .device-status {
   min-height: 0.8rem;
   margin-bottom: 0;
-  color: #4d4f46;
+  color: var(--secondary-text);
   font-size: 0.61rem;
   font-weight: 700;
   text-transform: lowercase;
@@ -192,10 +202,10 @@ h1 {
   display: grid;
   width: 2rem;
   height: 2rem;
-  border: 1px solid #292a25;
+  border: 1px solid var(--border);
   border-radius: 0.25rem;
-  color: #20211d;
-  background: #ebe7d9;
+  color: var(--primary-text);
+  background: var(--control-background);
   cursor: pointer;
   font-size: 1rem;
   font-weight: 650;
@@ -210,8 +220,8 @@ h1 {
 }
 
 .adjustment-control[open] summary {
-  color: #ebe7d9;
-  background: #20211d;
+  color: var(--control-background);
+  background: var(--segment-fill);
 }
 
 .amount-form {
@@ -220,9 +230,9 @@ h1 {
   bottom: calc(100% + 0.5rem);
   left: 50%;
   width: 8.75rem;
-  border: 1px solid #292a25;
+  border: 1px solid var(--border);
   border-radius: 0.25rem;
-  background: #ebe7d9;
+  background: var(--page-background);
   padding: 0.5rem;
   transform: translateX(-50%);
 }
@@ -230,7 +240,7 @@ h1 {
 .amount-form label {
   display: block;
   margin-bottom: 0.35rem;
-  color: #5e6056;
+  color: var(--secondary-text);
   font-size: 0.58rem;
 }
 
@@ -242,7 +252,7 @@ h1 {
 }
 
 .amount-entry span {
-  color: #5e6056;
+  color: var(--secondary-text);
   font-size: 0.75rem;
 }
 
@@ -250,19 +260,31 @@ h1 {
   width: 100%;
   min-width: 0;
   height: 1.65rem;
-  border: 1px solid #77786e;
+  border: 1px solid var(--display-border);
   border-radius: 0.15rem;
-  background: #f4f1e6;
+  color: var(--primary-text);
+  background: var(--control-background);
   padding: 0 0.35rem;
   font-size: 0.72rem;
 }
 
+.amount-entry input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.amount-entry input[type="number"]::-webkit-inner-spin-button,
+.amount-entry input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
 .amount-entry button {
   height: 1.65rem;
-  border: 1px solid #292a25;
+  border: 1px solid var(--border);
   border-radius: 0.15rem;
-  color: #ebe7d9;
-  background: #20211d;
+  color: var(--control-background);
+  background: var(--segment-fill);
   padding: 0 0.35rem;
   cursor: pointer;
   font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -272,13 +294,13 @@ h1 {
 .adjustment-control summary:focus-visible,
 .amount-entry input:focus-visible,
 .amount-entry button:focus-visible {
-  outline: 2px solid #292a25;
+  outline: 2px solid var(--primary-text);
   outline-offset: 2px;
 }
 
 .empty-state {
   width: min(100%, 20rem);
-  border: 1px solid #77786e;
+  border: 1px solid var(--display-border);
   border-radius: 0.35rem;
   padding: 2rem 1.25rem;
   text-align: center;
@@ -286,7 +308,7 @@ h1 {
 
 .empty-symbol {
   margin-bottom: 0.75rem;
-  color: #77786e;
+  color: var(--secondary-text);
   font-size: 0.7rem;
 }
 
@@ -298,7 +320,7 @@ h1 {
 
 .empty-state p:last-child {
   margin-bottom: 0;
-  color: #6a6b62;
+  color: var(--secondary-text);
   font-size: 0.75rem;
 }
 
