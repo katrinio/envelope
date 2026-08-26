@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from src.envelope.service import (
     FINANCIAL_PILLOW_SALARY_MULTIPLIER,
     calculate_financial_pillow_target,
+    calculate_goal_projection,
     calculate_saving_insight,
 )
 from src.orm.contribution import Contribution
@@ -150,6 +152,11 @@ def _render_envelope_page(
 ) -> Response:
     envelopes = Envelope.for_user(user.id)
     regular_contributions = Contribution.regular_for_user(user.id)
+    contributions_by_envelope: dict[int, list[tuple[int, datetime]]] = {}
+    for contribution in regular_contributions:
+        contributions_by_envelope.setdefault(contribution.envelope_id, []).append(
+            (contribution.amount, contribution.contributed_at)
+        )
     saving_insight = calculate_saving_insight(
         user.salary,
         (
@@ -158,9 +165,19 @@ def _render_envelope_page(
         ),
     )
     envelope_items = []
+    goal_projections = []
     for envelope in envelopes:
         target_amount = envelope.target_amount
         progress_percentage = _calculate_progress_percentage(envelope, target_amount)
+        goal_projection = calculate_goal_projection(
+            envelope_id=envelope.id,
+            envelope_name=envelope.name,
+            current_amount=envelope.current_amount,
+            target_amount=target_amount,
+            regular_contributions=contributions_by_envelope.get(envelope.id, []),
+        )
+        if goal_projection is not None:
+            goal_projections.append(goal_projection)
         envelope_items.append(
             EnvelopePageItem(
                 envelope=envelope,
@@ -182,6 +199,7 @@ def _render_envelope_page(
             "amount_form": amount_form,
             "salary_form": salary_form,
             "saving_insight": saving_insight,
+            "goal_projections": goal_projections,
             "has_financial_pillow": any(envelope.is_financial_pillow for envelope in envelopes),
             "financial_pillow_target": (
                 calculate_financial_pillow_target(

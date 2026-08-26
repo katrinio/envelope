@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=saving-insight-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=goal-projection-1">
     <script src="{{ url_for('static', path='/envelope.js') }}?v=envelope-delete-dialog-1" defer></script>
   </head>
   <body>
@@ -393,7 +393,28 @@
           </article>
           <article class="insight-card">
             <p class="insight-question">How close are my goals?</p>
-            <p class="insight-placeholder">Insight will appear here.</p>
+            {% if goal_projections %}
+              <div class="goal-projection-list">
+                {% for projection in goal_projections %}
+                  <section class="goal-projection">
+                    <p class="goal-projection-name">{{ projection.envelope_name }}</p>
+                    <p class="goal-projection-remaining">
+                      €{{ "{:,}".format(projection.remaining_amount) }} to go
+                    </p>
+                    {% if projection.completion_month %}
+                      <p class="goal-projection-date">
+                        <span>At your current pace:</span>
+                        <strong>{{ projection.completion_month }}</strong>
+                      </p>
+                    {% else %}
+                      <p class="goal-projection-empty">Not enough data to estimate yet.</p>
+                    {% endif %}
+                  </section>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="insight-placeholder">No active savings goals right now.</p>
+            {% endif %}
           </article>
           <article class="insight-card">
             <p class="insight-question">What needs attention?</p>

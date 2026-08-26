@@ -1,3 +1,4 @@
+from calendar import month_name
 from collections.abc import Iterator
 from datetime import date, datetime
 from pathlib import Path
@@ -121,6 +122,7 @@ def test_insights_section_is_collapsed_and_contains_three_cards(client: TestClie
     assert "How close are my goals?" in response.text
     assert "What needs attention?" in response.text
     assert "No regular contribution history yet." in response.text
+    assert "No active savings goals right now." in response.text
     assert ".insights-list" in stylesheet
     assert "width: 100%;" in stylesheet
 
@@ -398,6 +400,67 @@ def test_saving_insight_combines_regular_contributions_from_all_envelopes(
     assert "over the last 3 complete" in response.text
     assert "months" in response.text
     assert "9,000/month" not in response.text
+
+
+def test_goal_projections_use_each_envelopes_regular_contributions(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_000)
+    projected = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=3_800,
+        target_amount=5_000,
+        priority=1,
+    )
+    no_history = Envelope.create(
+        user_id=user.id,
+        name="Camera",
+        current_amount=200,
+        target_amount=1_000,
+        priority=2,
+    )
+    Envelope.create(
+        user_id=user.id,
+        name="Completed",
+        current_amount=1_000,
+        target_amount=1_000,
+        priority=3,
+    )
+    current_month = date.today().replace(day=1)
+    current_month_index = current_month.year * 12 + current_month.month - 1
+
+    for offset in range(-3, 0):
+        year, zero_based_month = divmod(current_month_index + offset, 12)
+        Contribution.create(
+            envelope_id=projected.id,
+            amount=400,
+            is_regular=True,
+            contributed_at=datetime(year, zero_based_month + 1, 10),
+        )
+
+    previous_year, previous_month = divmod(current_month_index - 1, 12)
+    Contribution.create(
+        envelope_id=projected.id,
+        amount=3_000,
+        is_regular=False,
+        contributed_at=datetime(previous_year, previous_month + 1, 12),
+    )
+
+    completion_year, completion_month_index = divmod(current_month_index + 3, 12)
+    expected_completion = f"{month_name[completion_month_index + 1]} {completion_year}"
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert "Trip" in response.text
+    assert "€1,200 to go" in response.text
+    assert f"<strong>{expected_completion}</strong>" in response.text
+    assert "Camera" in response.text
+    assert "€800 to go" in response.text
+    assert "Not enough data to estimate yet." in response.text
+    insights_html = response.text.split('<div class="insights-list">', maxsplit=1)[1]
+    assert "Completed" not in insights_html
+    assert no_history.current_amount == 200
 
 
 def test_decrement_below_zero_renders_local_amount_error(client: TestClient) -> None:

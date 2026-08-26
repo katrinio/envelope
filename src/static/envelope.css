@@ -940,6 +940,56 @@ h1 {
   letter-spacing: 0.02em;
 }
 
+.goal-projection-list {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 0.55rem;
+}
+
+.goal-projection + .goal-projection {
+  border-top: 1px solid var(--display-border);
+  padding-top: 0.7rem;
+}
+
+.goal-projection p {
+  margin-bottom: 0;
+}
+
+.goal-projection-name {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.goal-projection-remaining,
+.goal-projection-empty,
+.goal-projection-date span {
+  color: var(--secondary-text);
+  font-size: 0.64rem;
+}
+
+.goal-projection-remaining {
+  margin-top: 0.2rem;
+}
+
+.goal-projection-date {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin-top: 0.32rem;
+}
+
+.goal-projection-date strong {
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.goal-projection-empty {
+  margin-top: 0.32rem;
+}
+
 .progress-segments {
   display: grid;
   grid-template-columns: repeat(10, 1fr);

@@ -1,7 +1,8 @@
+from calendar import month_name
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 
 FINANCIAL_PILLOW_SALARY_MULTIPLIER = 2
 
@@ -12,6 +13,14 @@ class SavingInsight:
     average_saving_rate: int
     months_count: int
     trend_message: str | None
+
+
+@dataclass(frozen=True)
+class GoalProjection:
+    envelope_id: int
+    envelope_name: str
+    remaining_amount: int
+    completion_month: str | None
 
 
 def calculate_financial_pillow_target(
@@ -102,4 +111,57 @@ def calculate_saving_insight(
         average_saving_rate=_round_decimal(average_rate),
         months_count=months_count,
         trend_message=trend_message,
+    )
+
+
+def calculate_goal_projection(
+    envelope_id: int,
+    envelope_name: str,
+    current_amount: int,
+    target_amount: int,
+    regular_contributions: Iterable[tuple[int, date | datetime]],
+    today: date | None = None,
+) -> GoalProjection | None:
+    remaining_amount = target_amount - current_amount
+    if remaining_amount <= 0:
+        return None
+
+    current_month = (today or date.today()).replace(day=1)
+    dated_amounts = [
+        (amount, contribution_date)
+        for amount, contributed_at in regular_contributions
+        if (contribution_date := _as_date(contributed_at)) < current_month
+    ]
+    main_period_start = _shift_month(current_month, -3)
+    main_contributions = [
+        (amount, contributed_at)
+        for amount, contributed_at in dated_amounts
+        if main_period_start <= contributed_at < current_month
+    ]
+    completion_month: str | None = None
+    if main_contributions:
+        first_history_month = min(contributed_at for _, contributed_at in dated_amounts).replace(
+            day=1
+        )
+        available_start = max(main_period_start, first_history_month)
+        months_count = _month_count(available_start, current_month)
+        total_saved = sum(
+            amount
+            for amount, contributed_at in main_contributions
+            if contributed_at >= available_start
+        )
+        average_amount = Decimal(total_saved) / months_count
+        months_remaining = int(
+            (Decimal(remaining_amount) / average_amount).to_integral_value(
+                rounding=ROUND_CEILING
+            )
+        )
+        completion_date = _shift_month(current_month, months_remaining)
+        completion_month = f"{month_name[completion_date.month]} {completion_date.year}"
+
+    return GoalProjection(
+        envelope_id=envelope_id,
+        envelope_name=envelope_name,
+        remaining_amount=remaining_amount,
+        completion_month=completion_month,
     )

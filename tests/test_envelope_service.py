@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from src.envelope.service import calculate_saving_insight
+from src.envelope.service import calculate_goal_projection, calculate_saving_insight
 
 
 def test_saving_insight_uses_last_three_complete_months_and_shows_trend() -> None:
@@ -83,3 +83,65 @@ def test_saving_insight_has_empty_state_without_complete_month_history() -> None
     )
 
     assert insight is None
+
+
+def test_goal_projection_uses_envelope_pace_and_rounds_months_up() -> None:
+    projection = calculate_goal_projection(
+        envelope_id=1,
+        envelope_name="Trip",
+        current_amount=800,
+        target_amount=2_000,
+        regular_contributions=[
+            (400, date(2026, 5, 1)),
+            (400, date(2026, 6, 1)),
+            (400, date(2026, 7, 1)),
+            (9_000, date(2026, 8, 1)),
+        ],
+        today=date(2026, 8, 26),
+    )
+
+    assert projection is not None
+    assert projection.remaining_amount == 1_200
+    assert projection.completion_month == "November 2026"
+
+
+def test_goal_projection_uses_limited_complete_history() -> None:
+    projection = calculate_goal_projection(
+        envelope_id=1,
+        envelope_name="Trip",
+        current_amount=200,
+        target_amount=1_000,
+        regular_contributions=[(400, date(2026, 7, 10))],
+        today=date(2026, 8, 26),
+    )
+
+    assert projection is not None
+    assert projection.completion_month == "October 2026"
+
+
+def test_goal_projection_omits_date_without_recent_regular_history() -> None:
+    projection = calculate_goal_projection(
+        envelope_id=1,
+        envelope_name="Trip",
+        current_amount=200,
+        target_amount=1_000,
+        regular_contributions=[(400, date(2026, 8, 1))],
+        today=date(2026, 8, 26),
+    )
+
+    assert projection is not None
+    assert projection.remaining_amount == 800
+    assert projection.completion_month is None
+
+
+def test_goal_projection_excludes_completed_goal() -> None:
+    projection = calculate_goal_projection(
+        envelope_id=1,
+        envelope_name="Trip",
+        current_amount=1_200,
+        target_amount=1_000,
+        regular_contributions=[(100, date(2026, 7, 1))],
+        today=date(2026, 8, 26),
+    )
+
+    assert projection is None
