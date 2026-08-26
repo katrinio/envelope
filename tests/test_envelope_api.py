@@ -451,10 +451,19 @@ def test_envelope_edit_menu_is_rendered(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert 'class="device-menu"' in response.text
+    assert 'class="device-menu-trigger"' in response.text
+    assert 'aria-label="Envelope actions"' in response.text
+    assert 'role="menu"' in response.text
     assert "•••" in response.text
     assert "Edit" in response.text
     assert "Delete" in response.text
     assert f"?edit_envelope_id={envelope.id}" in response.text
+    assert f'data-delete-url="http://testserver/envelopes/{envelope.id}"' in response.text
+    assert '<details class="device-menu"' not in response.text
+
+    script_response = client.get("/static/envelope.js")
+    assert script_response.status_code == 200
+    assert 'method: "DELETE"' in script_response.text
 
 
 def test_regular_envelope_name_can_be_updated(client: TestClient) -> None:
@@ -578,7 +587,7 @@ def test_edit_form_errors_are_local_to_envelope_tile(client: TestClient) -> None
     )
 
     assert response.status_code == 422
-    assert 'class="configuration-panel"' in response.text
+    assert 'class="device-screen configuration-screen"' in response.text
     assert "Add a name." in response.text
     assert "Use an amount above 0." in response.text
     assert Envelope.get(envelope.id).name == "Trip"  # type: ignore[union-attr]
@@ -635,8 +644,12 @@ def test_financial_pillow_edit_ui_shows_read_only_calculated_goal(
 
     assert response.status_code == 200
     assert "Edit envelope" in response.text
+    assert 'class="envelope-device"' in response.text
+    assert 'class="device-screen configuration-screen"' in response.text
     assert "€3,000" in response.text
     assert f"edit-envelope-target-{envelope.id}" not in response.text
+    assert f"amount-increment-{envelope.id}" not in response.text
+    assert f"amount-decrement-{envelope.id}" not in response.text
     assert f"2 {chr(215)} monthly salary" in response.text
 
 

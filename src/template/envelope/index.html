@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
     <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}">
+    <script src="{{ url_for('static', path='/envelope.js') }}" defer></script>
   </head>
   <body>
     <main class="page-shell">
@@ -20,7 +21,7 @@
         {% for item in envelope_items %}
           <article class="envelope-device">
             {% if editing_envelope_id == item.envelope.id %}
-              <div class="configuration-panel">
+              <div class="device-screen configuration-screen">
                 <p class="configuration-title">Edit envelope</p>
                 <form
                   class="configuration-form"
@@ -91,20 +92,46 @@
                 </form>
               </div>
             {% else %}
-            <details class="device-menu">
-              <summary aria-label="Envelope menu">•••</summary>
-              <div class="device-menu-items">
-                <a href="{{ url_for('view_user_envelopes', user_id=user.id) }}?edit_envelope_id={{ item.envelope.id }}">
-                  Edit
-                </a>
-                <span aria-disabled="true">Delete</span>
-              </div>
-            </details>
-
             <div class="device-screen">
               <header class="device-heading">
                 <h2>{{ item.envelope.name }}</h2>
-                <span class="percentage">{{ item.progress_percentage }}%</span>
+                <div class="device-heading-actions">
+                  <span class="percentage">{{ item.progress_percentage }}%</span>
+                  <div class="device-menu">
+                    <button
+                      class="device-menu-trigger"
+                      type="button"
+                      aria-label="Envelope actions"
+                      aria-haspopup="menu"
+                      aria-expanded="false"
+                      aria-controls="envelope-menu-{{ item.envelope.id }}"
+                    >
+                      <span aria-hidden="true">•••</span>
+                    </button>
+                    <div
+                      class="device-menu-popup"
+                      id="envelope-menu-{{ item.envelope.id }}"
+                      role="menu"
+                      hidden
+                    >
+                      <a
+                        role="menuitem"
+                        href="{{ url_for('view_user_envelopes', user_id=user.id) }}?edit_envelope_id={{ item.envelope.id }}"
+                      >
+                        Edit
+                      </a>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        data-delete-envelope
+                        data-delete-url="{{ url_for('delete_envelope', envelope_id=item.envelope.id) }}"
+                      >
+                        Delete
+                      </button>
+                      <p class="device-menu-error" role="status" hidden>Try again.</p>
+                    </div>
+                  </div>
+                </div>
               </header>
 
               <div
