@@ -9,6 +9,7 @@ from src.envelope.service import (
     FINANCIAL_PILLOW_SALARY_MULTIPLIER,
     calculate_financial_pillow_target,
 )
+from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope, EnvelopeKind
 from src.orm.user import User
 from src.template import templates
@@ -97,6 +98,7 @@ class EnvelopeAmountForm:
     envelope_id: int
     operation: Literal["increment", "decrement"]
     amount: str
+    is_regular: bool
     error: str
 
 
@@ -485,6 +487,7 @@ def change_envelope_amount(
     envelope_id: int,
     operation: Annotated[Literal["increment", "decrement"], Form()],
     amount: Annotated[str, Form()] = "",
+    regular_contribution: Annotated[bool, Form()] = True,
 ) -> Response:
     user = User.get(user_id)
     if user is None:
@@ -501,10 +504,15 @@ def change_envelope_amount(
     else:
         if parsed_amount <= 0:
             error_message = "Use an amount above 0."
+        elif operation == "increment":
+            Contribution.add_to_envelope(
+                envelope_id=envelope.id,
+                amount=parsed_amount,
+                is_regular=regular_contribution,
+            )
         else:
-            delta = parsed_amount if operation == "increment" else -parsed_amount
             try:
-                _set_current_amount(envelope, envelope.current_amount + delta)
+                _set_current_amount(envelope, envelope.current_amount - parsed_amount)
             except ValueError:
                 error_message = "Saved amount cannot go below €0."
 
@@ -516,6 +524,7 @@ def change_envelope_amount(
                 envelope_id=envelope_id,
                 operation=operation,
                 amount=amount,
+                is_regular=regular_contribution,
                 error=error_message,
             ),
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

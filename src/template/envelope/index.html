@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=insights-section-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=regular-contribution-1">
     <script src="{{ url_for('static', path='/envelope.js') }}?v=envelope-delete-dialog-1" defer></script>
   </head>
   <body>
@@ -239,6 +239,18 @@
                       >
                       <button name="operation" value="{{ operation }}" type="submit">OK</button>
                     </div>
+                    {% if operation == 'increment' %}
+                      <label class="regular-contribution-option">
+                        <input name="regular_contribution" type="hidden" value="false">
+                        <input
+                          name="regular_contribution"
+                          type="checkbox"
+                          value="true"
+                          {% if not has_amount_error or amount_form.is_regular %}checked{% endif %}
+                        >
+                        <span>Regular contribution</span>
+                      </label>
+                    {% endif %}
                     {% if has_amount_error %}
                       <p class="amount-error" id="amount-error-{{ operation }}-{{ item.envelope.id }}">
                         {{ amount_form.error }}

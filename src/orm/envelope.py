@@ -11,6 +11,7 @@ from src.database import Base
 from src.envelope.service import calculate_financial_pillow_target
 
 if TYPE_CHECKING:
+    from src.orm.contribution import Contribution
     from src.orm.user import User
 
 
@@ -53,6 +54,10 @@ class Envelope(Base):
     pillow_index: Mapped[int] = mapped_column(Integer, default=2, server_default="2")
 
     user: Mapped[User] = relationship(back_populates="envelopes")
+    contributions: Mapped[list[Contribution]] = relationship(
+        back_populates="envelope",
+        cascade="all, delete-orphan",
+    )
 
     @validates("current_amount")
     def validate_current_amount(self, _key: str, value: int) -> int:

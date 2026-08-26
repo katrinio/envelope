@@ -1040,6 +1040,31 @@ h1 {
   border-color: var(--primary-text);
 }
 
+.amount-form .regular-contribution-option {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.4rem 0 0;
+  color: var(--secondary-text);
+  cursor: pointer;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.48rem;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.regular-contribution-option input[type="checkbox"] {
+  width: 0.72rem;
+  height: 0.72rem;
+  margin: 0;
+  accent-color: var(--segment-fill);
+}
+
+.regular-contribution-option input[type="checkbox"]:focus-visible {
+  outline: 1px solid var(--primary-text);
+  outline-offset: 2px;
+}
+
 .amount-error {
   margin: 0.3rem 0 0;
   color: var(--secondary-text);

@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from src import database
 from src.app import app
+from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope
 from src.orm.user import User
 
@@ -268,13 +269,77 @@ def test_envelope_page_changes_current_amount(client: TestClient) -> None:
     ).json()
     amount_url = f"/users/{user.id}/envelopes/{envelope['id']}/amount"
 
-    increment_response = client.post(amount_url, data={"amount": 50, "operation": "increment"})
+    increment_response = client.post(
+        amount_url,
+        data={
+            "amount": 50,
+            "operation": "increment",
+            "regular_contribution": ["false", "true"],
+        },
+    )
     assert increment_response.status_code == 200
     assert client.get(f"/envelopes/{envelope['id']}").json()["current_amount"] == 150
+    contributions = Contribution.for_envelope(envelope["id"])
+    assert len(contributions) == 1
+    assert contributions[0].amount == 50
+    assert contributions[0].is_regular is True
+    assert contributions[0].contributed_at is not None
 
     decrement_response = client.post(amount_url, data={"amount": 25, "operation": "decrement"})
     assert decrement_response.status_code == 200
     assert client.get(f"/envelopes/{envelope['id']}").json()["current_amount"] == 125
+    assert len(Contribution.for_envelope(envelope["id"])) == 1
+
+
+def test_add_money_shows_regular_contribution_checked_by_default(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Emergency fund",
+        target_amount=1_000,
+        priority=1,
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert response.text.count("Regular contribution") == 1
+    checkbox = response.text.split('name="regular_contribution"', maxsplit=2)[2].split(
+        ">", maxsplit=1
+    )[0]
+    assert 'type="checkbox"' in checkbox
+    assert "checked" in checkbox
+    assert f"amount-increment-{envelope.id}" in response.text
+
+
+def test_non_regular_contribution_is_persisted(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Emergency fund",
+        current_amount=100,
+        target_amount=1_000,
+        priority=1,
+    )
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/{envelope.id}/amount",
+        data={
+            "amount": "40",
+            "operation": "increment",
+            "regular_contribution": "false",
+        },
+    )
+
+    assert response.status_code == 200
+    stored_envelope = Envelope.get(envelope.id)
+    assert stored_envelope is not None
+    assert stored_envelope.current_amount == 140
+    contributions = Contribution.for_envelope(envelope.id)
+    assert len(contributions) == 1
+    assert contributions[0].amount == 40
+    assert contributions[0].is_regular is False
+    assert contributions[0].contributed_at is not None
 
 
 def test_decrement_below_zero_renders_local_amount_error(client: TestClient) -> None:
