@@ -436,3 +436,291 @@ def test_financial_pillow_form_keeps_selection_after_validation_error(
     checkbox = response.text.split('id="financial-pillow"', maxsplit=1)[1].split(">", maxsplit=1)[0]
     assert "checked" in checkbox
     assert "€3,000" in response.text
+
+
+def test_envelope_edit_menu_is_rendered(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        target_amount=1_200,
+        priority=1,
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert 'class="device-menu"' in response.text
+    assert 'class="device-menu-trigger"' in response.text
+    assert 'aria-label="Envelope actions"' in response.text
+    assert 'role="menu"' in response.text
+    assert "•••" in response.text
+    assert "Edit" in response.text
+    assert "Delete" in response.text
+    assert f"?edit_envelope_id={envelope.id}" in response.text
+    assert f'data-delete-url="http://testserver/envelopes/{envelope.id}"' in response.text
+    assert '<details class="device-menu"' not in response.text
+
+    script_response = client.get("/static/envelope.js")
+    assert script_response.status_code == 200
+    assert 'method: "DELETE"' in script_response.text
+
+
+def test_regular_envelope_name_can_be_updated(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=300,
+        target_amount=1_200,
+        priority=1,
+    )
+
+    response = client.patch(
+        f"/envelopes/{envelope.id}",
+        json={"name": "  New trip  ", "target_amount": 1_200},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "New trip"
+    assert response.json()["current_amount"] == 300
+    assert response.json()["kind"] == "regular"
+
+
+def test_regular_envelope_goal_can_be_updated(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=300,
+        target_amount=1_200,
+        priority=1,
+    )
+
+    response = client.patch(
+        f"/envelopes/{envelope.id}",
+        json={"name": "Trip", "target_amount": 2_000},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["target_amount"] == 2_000
+    assert response.json()["current_amount"] == 300
+
+
+@pytest.mark.parametrize("name", ["", "   "])
+def test_envelope_edit_rejects_blank_name(client: TestClient, name: str) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        target_amount=1_200,
+        priority=1,
+    )
+
+    response = client.patch(
+        f"/envelopes/{envelope.id}",
+        json={"name": name, "target_amount": 1_200},
+    )
+
+    assert response.status_code == 422
+    assert Envelope.get(envelope.id).name == "Trip"  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize("target_amount", [0, -1])
+def test_regular_envelope_edit_rejects_non_positive_goal(
+    client: TestClient,
+    target_amount: int,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        target_amount=1_200,
+        priority=1,
+    )
+
+    response = client.patch(
+        f"/envelopes/{envelope.id}",
+        json={"name": "Trip", "target_amount": target_amount},
+    )
+
+    assert response.status_code == 422
+    assert Envelope.get(envelope.id).target_amount == 1_200  # type: ignore[union-attr]
+
+
+def test_envelope_edit_cancel_does_not_persist_changes(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        target_amount=1_200,
+        priority=1,
+    )
+    page_url = f"/users/{user.id}/envelopes/page"
+
+    edit_response = client.get(f"{page_url}?edit_envelope_id={envelope.id}")
+    cancel_response = client.get(page_url)
+
+    assert edit_response.status_code == 200
+    assert "Edit envelope" in edit_response.text
+    assert f'href="http://testserver{page_url}"' in edit_response.text
+    assert cancel_response.status_code == 200
+    assert "Edit envelope" not in cancel_response.text
+    stored_envelope = Envelope.get(envelope.id)
+    assert stored_envelope is not None
+    assert stored_envelope.name == "Trip"
+    assert stored_envelope.target_amount == 1_200
+
+
+def test_edit_form_errors_are_local_to_envelope_tile(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        target_amount=1_200,
+        priority=1,
+    )
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/{envelope.id}/edit",
+        data={"name": "   ", "target_amount": "0"},
+    )
+
+    assert response.status_code == 422
+    assert 'class="device-screen configuration-screen"' in response.text
+    assert "Add a name." in response.text
+    assert "Use an amount above 0." in response.text
+    assert Envelope.get(envelope.id).name == "Trip"  # type: ignore[union-attr]
+
+
+def test_financial_pillow_name_can_be_edited_but_goal_cannot(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Reserve",
+        current_amount=500,
+        priority=1,
+        kind="financial_pillow",
+    )
+
+    name_response = client.patch(
+        f"/envelopes/{envelope.id}",
+        json={"name": "Safe place"},
+    )
+    override_response = client.patch(
+        f"/envelopes/{envelope.id}",
+        json={"name": "Changed", "target_amount": 1},
+    )
+
+    assert name_response.status_code == 200
+    assert name_response.json()["name"] == "Safe place"
+    assert name_response.json()["target_amount"] == 3_000
+    assert name_response.json()["current_amount"] == 500
+    assert name_response.json()["kind"] == "financial_pillow"
+    assert override_response.status_code == 422
+    stored_envelope = Envelope.get(envelope.id)
+    assert stored_envelope is not None
+    assert stored_envelope.name == "Safe place"
+    assert stored_envelope.target_amount == 3_000
+    assert stored_envelope.kind == "financial_pillow"
+
+
+def test_financial_pillow_edit_ui_shows_read_only_calculated_goal(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Reserve",
+        priority=1,
+        kind="financial_pillow",
+    )
+
+    response = client.get(
+        f"/users/{user.id}/envelopes/page?edit_envelope_id={envelope.id}"
+    )
+
+    assert response.status_code == 200
+    assert "Edit envelope" in response.text
+    assert 'class="envelope-device"' in response.text
+    assert 'class="device-screen configuration-screen"' in response.text
+    assert "€3,000" in response.text
+    assert f"edit-envelope-target-{envelope.id}" not in response.text
+    assert f"amount-increment-{envelope.id}" not in response.text
+    assert f"amount-decrement-{envelope.id}" not in response.text
+    assert f"2 {chr(215)} monthly salary" in response.text
+
+
+@pytest.mark.parametrize(
+    ("original_kind", "new_kind"),
+    [("regular", "financial_pillow"), ("financial_pillow", "regular")],
+)
+def test_envelope_kind_cannot_be_changed_during_edit(
+    client: TestClient,
+    original_kind: str,
+    new_kind: str,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Savings",
+        target_amount=1_200 if original_kind == "regular" else None,
+        priority=1,
+        kind=original_kind,
+    )
+    payload: dict[str, object] = {"name": "Savings", "kind": new_kind}
+    if original_kind == "regular":
+        payload["target_amount"] = 1_200
+
+    response = client.patch(f"/envelopes/{envelope.id}", json=payload)
+
+    assert response.status_code == 422
+    assert Envelope.get(envelope.id).kind == original_kind  # type: ignore[union-attr]
+
+
+def test_regular_envelope_edit_updates_progress_and_status(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=750,
+        target_amount=1_500,
+        priority=1,
+    )
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/{envelope.id}/edit",
+        data={"name": "Trip", "target_amount": "1000"},
+    )
+
+    assert response.status_code == 200
+    assert "75%" in response.text
+    assert 'aria-valuenow="75"' in response.text
+    assert response.text.count('class="progress-segment is-filled"') == 7
+    assert "€250 to go" in response.text
+    assert "€750" in response.text
+
+
+def test_regular_envelope_edit_keeps_savings_above_new_goal(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=1_200,
+        target_amount=2_000,
+        priority=1,
+    )
+
+    response = client.patch(
+        f"/envelopes/{envelope.id}",
+        json={"name": "Trip", "target_amount": 1_000},
+    )
+    page_response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert response.json()["current_amount"] == 1_200
+    assert "100%" in page_response.text
+    assert "goal reached ✓" in page_response.text
+    assert "€1,200" in page_response.text
