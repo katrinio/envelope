@@ -42,8 +42,9 @@ def test_existing_envelopes_become_regular_after_migration(tmp_path: Path) -> No
 
     with engine.connect() as connection:
         migrated_envelope = connection.execute(
-            text("SELECT kind, target_amount FROM envelopes WHERE id = 1")
+            text("SELECT kind, target_amount, pillow_index FROM envelopes WHERE id = 1")
         ).one()
 
     assert migrated_envelope.kind == "regular"
     assert migrated_envelope.target_amount == 1_200
+    assert migrated_envelope.pillow_index == 2
