@@ -4,7 +4,21 @@ const deleteDialog = document.querySelector("[data-delete-dialog]");
 const deleteDialogCancel = deleteDialog.querySelector("[data-delete-cancel]");
 const deleteDialogConfirm = deleteDialog.querySelector("[data-delete-confirm]");
 const deleteDialogError = deleteDialog.querySelector(".delete-dialog-error");
+const historyDialog = document.querySelector("[data-history-dialog]");
 let pendingDeleteButton = null;
+
+if (historyDialog) {
+  const closeUrl = historyDialog.dataset.closeUrl;
+  // The server renders the panel open so it also works without JavaScript;
+  // upgrade it to a modal here to get the native backdrop and focus handling.
+  historyDialog.showModal();
+  historyDialog.addEventListener("click", (event) => {
+    if (event.target === historyDialog) {
+      historyDialog.close();
+      window.location.href = closeUrl;
+    }
+  });
+}
 
 if (salaryEditor) {
   const salaryDisplay = salaryEditor.querySelector(".salary-display");

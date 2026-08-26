@@ -269,7 +269,13 @@
             {% endif %}
           </article>
           {% if history_envelope_id == item.envelope.id %}
-            <dialog class="history-dialog" open aria-labelledby="history-dialog-title">
+            <dialog
+              class="history-dialog"
+              data-history-dialog
+              data-close-url="{{ url_for('view_user_envelopes', user_id=user.id) }}"
+              open
+              aria-labelledby="history-dialog-title"
+            >
               <div class="history-dialog-content">
                 <header class="history-dialog-header">
                   <p class="history-dialog-title" id="history-dialog-title">
@@ -278,8 +284,9 @@
                   <a
                     class="history-dialog-close"
                     href="{{ url_for('view_user_envelopes', user_id=user.id) }}"
+                    aria-label="Close history"
                   >
-                    Close
+                    <span aria-hidden="true">×</span>
                   </a>
                 </header>
 
@@ -477,7 +484,7 @@
 
       <details class="insights-section">
         <summary class="insights-summary">
-          <h2>insights</h2>
+          <h2>Insights</h2>
           <span class="insights-toggle" aria-hidden="true"></span>
         </summary>
         <div class="insights-list">

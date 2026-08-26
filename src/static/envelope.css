@@ -748,6 +748,7 @@ h1 {
   width: min(18rem, calc(100vw - 2rem));
   border: 1px solid var(--border);
   border-radius: 0.25rem;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
   color: var(--primary-text);
   background: var(--device-background);
   padding: 0;
@@ -843,11 +844,11 @@ h1 {
 }
 
 .history-dialog::backdrop {
-  background: rgb(42 41 37 / 18%);
+  background: rgb(0 0 0 / 20%);
 }
 
 .history-dialog-content {
-  padding: 1rem;
+  padding: 1.25rem;
 }
 
 .history-dialog-header {
@@ -856,7 +857,7 @@ h1 {
   justify-content: space-between;
   gap: 1rem;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 0.65rem;
+  padding-bottom: 0.8rem;
 }
 
 .history-dialog-title,
@@ -891,8 +892,8 @@ h1 {
 
 .history-list {
   display: grid;
-  gap: 1rem;
-  padding-top: 0.9rem;
+  gap: 1.2rem;
+  padding-top: 1.05rem;
 }
 
 .history-day-label {
