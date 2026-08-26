@@ -44,8 +44,11 @@
 
               <p class="amounts">
                 <strong>€{{ "{:,}".format(item.envelope.current_amount) }}</strong>
-                <span>/ €{{ "{:,}".format(item.envelope.target_amount) }}</span>
+                <span>/ €{{ "{:,}".format(item.target_amount) }}</span>
               </p>
+              {% if item.envelope.is_financial_pillow %}
+                <p class="calculated-goal">2 × monthly salary</p>
+              {% endif %}
               <p class="device-status">{{ item.status_message }}</p>
             </div>
 
@@ -115,7 +118,33 @@
                 {% endif %}
               </div>
 
-              <div class="creation-field">
+              <div class="pillow-option">
+                <input
+                  class="pillow-toggle"
+                  id="financial-pillow"
+                  name="financial_pillow"
+                  type="checkbox"
+                  value="financial_pillow"
+                  {% if creation_form and creation_form.is_financial_pillow %}checked{% endif %}
+                  {% if has_financial_pillow %}disabled{% endif %}
+                  {% if has_financial_pillow %}aria-describedby="financial-pillow-unavailable"{% endif %}
+                >
+                <label for="financial-pillow">Financial pillow</label>
+                <span class="info-tip" tabindex="0" aria-describedby="financial-pillow-help">
+                  ⓘ
+                  <span class="info-tooltip" id="financial-pillow-help" role="tooltip">
+                    A reserve for unexpected expenses. Its goal is calculated automatically from your monthly salary.
+                  </span>
+                </span>
+              </div>
+              {% if has_financial_pillow %}
+                <p class="option-note" id="financial-pillow-unavailable">You already have a financial pillow.</p>
+              {% endif %}
+              {% if creation_form and creation_form.errors.get('financial_pillow') %}
+                <p class="field-error">{{ creation_form.errors.financial_pillow }}</p>
+              {% endif %}
+
+              <div class="creation-field regular-goal">
                 <label for="new-envelope-target">Goal</label>
                 <div class="goal-entry">
                   <span aria-hidden="true">€</span>
@@ -136,6 +165,16 @@
                 {% if creation_form and creation_form.errors.get('target_amount') %}
                   <p class="field-error" id="new-envelope-target-error">{{ creation_form.errors.target_amount }}</p>
                 {% endif %}
+              </div>
+
+              <div class="creation-field pillow-goal" aria-live="polite">
+                <span class="field-label">Goal</span>
+                {% if financial_pillow_target %}
+                  <output>€{{ "{:,}".format(financial_pillow_target) }}</output>
+                {% else %}
+                  <output>Salary needed</output>
+                {% endif %}
+                <p>2 × monthly salary</p>
               </div>
 
               <div class="creation-actions">

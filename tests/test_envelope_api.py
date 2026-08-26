@@ -34,6 +34,7 @@ def test_envelope_crud(client: TestClient) -> None:
     assert create_response.status_code == 201
     envelope = create_response.json()
     assert envelope["current_amount"] == 0
+    assert envelope["kind"] == "regular"
 
     list_response = client.get(f"/users/{user.id}/envelopes")
     assert list_response.status_code == 200
@@ -254,3 +255,184 @@ def test_envelope_page_changes_current_amount(client: TestClient) -> None:
     decrement_response = client.post(amount_url, data={"amount": 25, "operation": "decrement"})
     assert decrement_response.status_code == 200
     assert client.get(f"/envelopes/{envelope['id']}").json()["current_amount"] == 125
+
+
+def test_financial_pillow_uses_current_salary_and_ignores_supplied_target(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+
+    response = client.post(
+        f"/users/{user.id}/envelopes",
+        json={
+            "name": "Rainy days",
+            "target_amount": 1,
+            "priority": 1,
+            "kind": "financial_pillow",
+        },
+    )
+
+    assert response.status_code == 201
+    envelope_data = response.json()
+    assert envelope_data["name"] == "Rainy days"
+    assert envelope_data["kind"] == "financial_pillow"
+    assert envelope_data["target_amount"] == 3_000
+    with database.SessionLocal() as session:
+        stored_envelope = session.get(Envelope, envelope_data["id"])
+        assert stored_envelope is not None
+        assert stored_envelope._target_amount is None
+
+    user.salary = 2_000
+    user.save()
+
+    updated_response = client.get(f"/envelopes/{envelope_data['id']}")
+    assert updated_response.status_code == 200
+    assert updated_response.json()["target_amount"] == 4_000
+    updated_page = client.get(f"/users/{user.id}/envelopes/page")
+    assert "€4,000" in updated_page.text
+
+
+def test_only_one_financial_pillow_is_allowed_per_user(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    payload = {
+        "name": "Reserve",
+        "priority": 1,
+        "kind": "financial_pillow",
+    }
+
+    first_response = client.post(f"/users/{user.id}/envelopes", json=payload)
+    second_response = client.post(
+        f"/users/{user.id}/envelopes",
+        json={**payload, "name": "Backup", "priority": 2},
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 422
+    assert second_response.json()["detail"] == "You already have a financial pillow."
+    assert len(Envelope.for_user(user.id)) == 1
+
+
+def test_different_users_can_have_financial_pillows(client: TestClient) -> None:
+    alice = User.create(userId=1, username="alice", salary=1_500)
+    bob = User.create(userId=2, username="bob", salary=2_000)
+
+    for user in (alice, bob):
+        response = client.post(
+            f"/users/{user.id}/envelopes",
+            json={
+                "name": "Reserve",
+                "priority": 1,
+                "kind": "financial_pillow",
+            },
+        )
+        assert response.status_code == 201
+
+    assert Envelope.for_user(alice.id)[0].target_amount == 3_000
+    assert Envelope.for_user(bob.id)[0].target_amount == 4_000
+
+
+def test_financial_pillow_requires_positive_salary(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=0)
+
+    response = client.post(
+        f"/users/{user.id}/envelopes",
+        json={"name": "Reserve", "priority": 1, "kind": "financial_pillow"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "A positive salary is needed for a financial pillow."
+
+
+def test_financial_pillow_creation_ui_and_calculated_goal(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+
+    initial_page = client.get(f"/users/{user.id}/envelopes/page")
+    assert 'id="financial-pillow"' in initial_page.text
+    assert "Financial pillow" in initial_page.text
+    assert 'class="creation-field regular-goal"' in initial_page.text
+    assert 'class="creation-field pillow-goal"' in initial_page.text
+    assert "€3,000" in initial_page.text
+    assert f"2 {chr(215)} monthly salary" in initial_page.text
+    assert "A reserve for unexpected expenses." in initial_page.text
+
+    create_response = client.post(
+        f"/users/{user.id}/envelopes/create",
+        data={
+            "name": "Whatever name",
+            "target_amount": "1",
+            "financial_pillow": "financial_pillow",
+        },
+    )
+
+    assert create_response.status_code == 200
+    assert "Whatever name" in create_response.text
+    assert "€3,000" in create_response.text
+    envelope = Envelope.for_user(user.id)[0]
+    assert envelope.is_financial_pillow
+    assert envelope.target_amount == 3_000
+
+
+def test_financial_pillow_checkbox_switches_goal_presentation(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+    stylesheet = Path("src/static/envelope.css").read_text()
+
+    assert response.status_code == 200
+    assert 'class="pillow-toggle"' in response.text
+    assert ".creation-form:has(.pillow-toggle:checked) .regular-goal" in stylesheet
+    assert ".creation-form:has(.pillow-toggle:checked) .pillow-goal" in stylesheet
+
+
+def test_financial_pillow_option_is_disabled_after_creation(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    Envelope.create(
+        user_id=user.id,
+        name="Reserve",
+        priority=1,
+        kind="financial_pillow",
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    checkbox = response.text.split('id="financial-pillow"', maxsplit=1)[1].split(">", maxsplit=1)[0]
+    assert "disabled" in checkbox
+    assert "You already have a financial pillow." in response.text
+
+
+def test_financial_pillow_progress_uses_calculated_target(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_000)
+    Envelope.create(
+        user_id=user.id,
+        name="Safe place",
+        current_amount=1_000,
+        priority=1,
+        kind="financial_pillow",
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert "50%" in response.text
+    assert 'aria-valuenow="50"' in response.text
+    assert response.text.count('class="progress-segment is-filled"') == 5
+    assert "€1,000 to go" in response.text
+    assert f"2 {chr(215)} monthly salary" in response.text
+
+
+def test_financial_pillow_form_keeps_selection_after_validation_error(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/create",
+        data={"name": "   ", "financial_pillow": "financial_pillow"},
+    )
+
+    assert response.status_code == 422
+    assert "Add a name." in response.text
+    checkbox = response.text.split('id="financial-pillow"', maxsplit=1)[1].split(">", maxsplit=1)[0]
+    assert "checked" in checkbox
+    assert "€3,000" in response.text
