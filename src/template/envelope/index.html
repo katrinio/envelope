@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=goal-projection-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=attention-insight-1">
     <script src="{{ url_for('static', path='/envelope.js') }}?v=envelope-delete-dialog-1" defer></script>
   </head>
   <body>
@@ -418,7 +418,21 @@
           </article>
           <article class="insight-card">
             <p class="insight-question">What needs attention?</p>
-            <p class="insight-placeholder">Insight will appear here.</p>
+            {% if attention_observations %}
+              <div class="attention-list">
+                {% for observation in attention_observations %}
+                  <section class="attention-observation">
+                    <p class="attention-title">{{ observation.title }}</p>
+                    <p class="attention-message">{{ observation.message }}</p>
+                  </section>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="attention-empty">
+                Nothing needs your attention right now.<br>
+                Your saving pattern looks consistent.
+              </p>
+            {% endif %}
           </article>
         </div>
       </details>

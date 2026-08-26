@@ -990,6 +990,37 @@ h1 {
   margin-top: 0.32rem;
 }
 
+.attention-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.55rem;
+}
+
+.attention-observation + .attention-observation {
+  border-top: 1px solid var(--display-border);
+  padding-top: 0.65rem;
+}
+
+.attention-observation p {
+  margin-bottom: 0;
+}
+
+.attention-title {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.attention-message,
+.attention-empty {
+  margin-top: 0.25rem;
+  color: var(--secondary-text);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
 .progress-segments {
   display: grid;
   grid-template-columns: repeat(10, 1fr);

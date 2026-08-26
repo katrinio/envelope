@@ -23,6 +23,21 @@ class GoalProjection:
     completion_month: str | None
 
 
+@dataclass(frozen=True)
+class GoalHistory:
+    envelope_id: int
+    envelope_name: str
+    current_amount: int
+    target_amount: int
+    regular_contributions: tuple[tuple[int, date | datetime], ...]
+
+
+@dataclass(frozen=True)
+class AttentionObservation:
+    title: str
+    message: str
+
+
 def calculate_financial_pillow_target(
     monthly_salary: int,
     pillow_index: int = FINANCIAL_PILLOW_SALARY_MULTIPLIER,
@@ -165,3 +180,134 @@ def calculate_goal_projection(
         remaining_amount=remaining_amount,
         completion_month=completion_month,
     )
+
+
+def calculate_attention_observations(
+    monthly_salary: int,
+    goal_histories: Iterable[GoalHistory],
+    today: date | None = None,
+) -> list[AttentionObservation]:
+    histories = list(goal_histories)
+    if monthly_salary <= 0:
+        return []
+
+    current_month = (today or date.today()).replace(day=1)
+    previous_period_start = _shift_month(current_month, -6)
+    recent_period_start = _shift_month(current_month, -3)
+    recent_stalled_start = _shift_month(current_month, -2)
+
+    def complete_dated_amounts(
+        contributions: Iterable[tuple[int, date | datetime]],
+    ) -> list[tuple[int, date]]:
+        return [
+            (amount, contribution_date)
+            for amount, contributed_at in contributions
+            if (contribution_date := _as_date(contributed_at)) < current_month
+        ]
+
+    all_contributions = [
+        contribution
+        for history in histories
+        for contribution in history.regular_contributions
+    ]
+    all_dated_amounts = complete_dated_amounts(all_contributions)
+    observations: list[AttentionObservation] = []
+    stalled_ids: set[int] = set()
+    pace_drop_observations: list[tuple[int, AttentionObservation]] = []
+
+    for history in histories:
+        if history.current_amount >= history.target_amount:
+            continue
+
+        dated_amounts = complete_dated_amounts(history.regular_contributions)
+        history_months = {
+            contribution_date.replace(day=1)
+            for _, contribution_date in dated_amounts
+            if contribution_date < recent_stalled_start
+        }
+        recent_stalled_contributions = [
+            contribution_date
+            for _, contribution_date in dated_amounts
+            if recent_stalled_start <= contribution_date < current_month
+        ]
+        if len(history_months) >= 2 and not recent_stalled_contributions:
+            stalled_ids.add(history.envelope_id)
+            observations.append(
+                AttentionObservation(
+                    title=history.envelope_name,
+                    message="No regular contributions for 2 months.",
+                )
+            )
+
+        first_history_month = (
+            min(contribution_date for _, contribution_date in dated_amounts).replace(day=1)
+            if dated_amounts
+            else None
+        )
+        if first_history_month is None or first_history_month > previous_period_start:
+            continue
+
+        previous_total = sum(
+            amount
+            for amount, contribution_date in dated_amounts
+            if previous_period_start <= contribution_date < recent_period_start
+        )
+        recent_total = sum(
+            amount
+            for amount, contribution_date in dated_amounts
+            if recent_period_start <= contribution_date < current_month
+        )
+        if previous_total <= 0:
+            continue
+
+        drop_percentage = (Decimal(previous_total - recent_total) / previous_total) * 100
+        if drop_percentage >= 25:
+            pace_drop_observations.append(
+                (
+                    history.envelope_id,
+                    AttentionObservation(
+                        title=history.envelope_name,
+                        message=(
+                            "Your recent saving pace is "
+                            f"{_round_decimal(drop_percentage)}% lower than in the previous 3 months."
+                        ),
+                    ),
+                )
+            )
+
+    observations.extend(
+        observation
+        for envelope_id, observation in pace_drop_observations
+        if envelope_id not in stalled_ids
+    )
+
+    if (
+        all_dated_amounts
+        and min(contribution_date for _, contribution_date in all_dated_amounts).replace(day=1)
+        <= previous_period_start
+    ):
+        previous_total = sum(
+            amount
+            for amount, contribution_date in all_dated_amounts
+            if previous_period_start <= contribution_date < recent_period_start
+        )
+        recent_total = sum(
+            amount
+            for amount, contribution_date in all_dated_amounts
+            if recent_period_start <= contribution_date < current_month
+        )
+        previous_rate = Decimal(previous_total) / 3 / monthly_salary * 100
+        recent_rate = Decimal(recent_total) / 3 / monthly_salary * 100
+        drop_points = previous_rate - recent_rate
+        if drop_points >= 5 and not pace_drop_observations:
+            observations.append(
+                AttentionObservation(
+                    title="Saving pace",
+                    message=(
+                        "Your regular saving rate is "
+                        f"{_round_decimal(drop_points)} pp lower than in the previous 3 months."
+                    ),
+                )
+            )
+
+    return observations[:3]

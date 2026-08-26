@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.envelope.service import (
     FINANCIAL_PILLOW_SALARY_MULTIPLIER,
+    GoalHistory,
+    calculate_attention_observations,
     calculate_financial_pillow_target,
     calculate_goal_projection,
     calculate_saving_insight,
@@ -166,9 +168,21 @@ def _render_envelope_page(
     )
     envelope_items = []
     goal_projections = []
+    goal_histories: list[GoalHistory] = []
     for envelope in envelopes:
         target_amount = envelope.target_amount
         progress_percentage = _calculate_progress_percentage(envelope, target_amount)
+        goal_histories.append(
+            GoalHistory(
+                envelope_id=envelope.id,
+                envelope_name=envelope.name,
+                current_amount=envelope.current_amount,
+                target_amount=target_amount,
+                regular_contributions=tuple(
+                    contributions_by_envelope.get(envelope.id, [])
+                ),
+            )
+        )
         goal_projection = calculate_goal_projection(
             envelope_id=envelope.id,
             envelope_name=envelope.name,
@@ -187,6 +201,7 @@ def _render_envelope_page(
                 status_message=_envelope_status(envelope, target_amount, progress_percentage),
             )
         )
+    attention_observations = calculate_attention_observations(user.salary, goal_histories)
     return templates.TemplateResponse(
         request,
         "envelope/index.html",
@@ -200,6 +215,7 @@ def _render_envelope_page(
             "salary_form": salary_form,
             "saving_insight": saving_insight,
             "goal_projections": goal_projections,
+            "attention_observations": attention_observations,
             "has_financial_pillow": any(envelope.is_financial_pillow for envelope in envelopes),
             "financial_pillow_target": (
                 calculate_financial_pillow_target(

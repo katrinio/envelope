@@ -1,6 +1,11 @@
 from datetime import date, datetime
 
-from src.envelope.service import calculate_goal_projection, calculate_saving_insight
+from src.envelope.service import (
+    GoalHistory,
+    calculate_attention_observations,
+    calculate_goal_projection,
+    calculate_saving_insight,
+)
 
 
 def test_saving_insight_uses_last_three_complete_months_and_shows_trend() -> None:
@@ -145,3 +150,113 @@ def test_goal_projection_excludes_completed_goal() -> None:
     )
 
     assert projection is None
+
+
+def test_attention_prioritizes_stalled_goals_and_limits_observations() -> None:
+    histories = tuple(
+        GoalHistory(
+            envelope_id=envelope_id,
+            envelope_name=f"Goal {envelope_id}",
+            current_amount=100,
+            target_amount=1_000,
+            regular_contributions=(
+                (100, date(2026, 4, 1)),
+                (100, date(2026, 5, 1)),
+            ),
+        )
+        for envelope_id in range(1, 5)
+    )
+
+    observations = calculate_attention_observations(
+        monthly_salary=1_000,
+        goal_histories=histories,
+        today=date(2026, 8, 26),
+    )
+
+    assert len(observations) == 3
+    assert [observation.title for observation in observations] == [
+        "Goal 1",
+        "Goal 2",
+        "Goal 3",
+    ]
+    assert all("No regular contributions for 2 months." in observation.message for observation in observations)
+
+
+def test_attention_reports_specific_pace_drop_without_general_duplicate() -> None:
+    history = GoalHistory(
+        envelope_id=1,
+        envelope_name="Trip",
+        current_amount=100,
+        target_amount=1_000,
+        regular_contributions=tuple(
+            (amount, date(year, month, 1))
+            for year, month, amount in [
+                (2026, 2, 200),
+                (2026, 3, 200),
+                (2026, 4, 200),
+                (2026, 5, 100),
+                (2026, 6, 100),
+                (2026, 7, 100),
+            ]
+        ),
+    )
+
+    observations = calculate_attention_observations(
+        monthly_salary=1_000,
+        goal_histories=[history],
+        today=date(2026, 8, 26),
+    )
+
+    assert len(observations) == 1
+    assert observations[0].title == "Trip"
+    assert "50% lower" in observations[0].message
+    assert "Saving pace" not in observations[0].title
+
+
+def test_attention_reports_overall_rate_drop_when_no_specific_goal_drop() -> None:
+    histories = [
+        GoalHistory(
+            envelope_id=1,
+            envelope_name="A",
+            current_amount=100,
+            target_amount=1_000,
+            regular_contributions=tuple(
+                (amount, date(year, month, 1))
+                for year, month, amount in [
+                    (2026, 2, 201),
+                    (2026, 3, 201),
+                    (2026, 4, 201),
+                    (2026, 5, 151),
+                    (2026, 6, 151),
+                    (2026, 7, 151),
+                ]
+            ),
+        ),
+        GoalHistory(
+            envelope_id=2,
+            envelope_name="B",
+            current_amount=100,
+            target_amount=1_000,
+            regular_contributions=tuple(
+                (100, date(year, month, 1))
+                for year, month in [
+                    (2026, 2),
+                    (2026, 3),
+                    (2026, 4),
+                    (2026, 5),
+                    (2026, 6),
+                    (2026, 7),
+                ]
+            ),
+        ),
+    ]
+
+    observations = calculate_attention_observations(
+        monthly_salary=1_000,
+        goal_histories=histories,
+        today=date(2026, 8, 26),
+    )
+
+    assert len(observations) == 1
+    assert observations[0].title == "Saving pace"
+    assert "5 pp lower" in observations[0].message

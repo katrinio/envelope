@@ -463,6 +463,35 @@ def test_goal_projections_use_each_envelopes_regular_contributions(
     assert no_history.current_amount == 200
 
 
+def test_attention_insight_is_rendered_for_specific_pace_drop(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_000)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=100,
+        target_amount=1_000,
+        priority=1,
+    )
+    current_month = date.today().replace(day=1)
+    current_month_index = current_month.year * 12 + current_month.month - 1
+    for offset, amount in [(-6, 200), (-5, 200), (-4, 200), (-3, 100), (-2, 100), (-1, 100)]:
+        year, zero_based_month = divmod(current_month_index + offset, 12)
+        Contribution.create(
+            envelope_id=envelope.id,
+            amount=amount,
+            is_regular=True,
+            contributed_at=datetime(year, zero_based_month + 1, 1),
+        )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert "What needs attention?" in response.text
+    assert "Trip" in response.text
+    assert "Your recent saving pace is 50% lower than in the previous 3 months." in response.text
+    assert "Nothing needs your attention right now." not in response.text
+
+
 def test_decrement_below_zero_renders_local_amount_error(client: TestClient) -> None:
     user = User.create(userId=1, username="alice", salary=100_000)
     envelope = Envelope.create(
