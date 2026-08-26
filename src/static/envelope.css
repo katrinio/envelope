@@ -825,6 +825,202 @@ h1 {
   opacity: 0.55;
 }
 
+.insights-section {
+  margin-top: 3rem;
+}
+
+.insights-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.8rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.insights-summary::-webkit-details-marker {
+  display: none;
+}
+
+.insights-summary h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.insights-toggle {
+  color: var(--secondary-text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.75rem;
+}
+
+.insights-toggle::before {
+  content: "+";
+}
+
+.insights-section[open] .insights-toggle::before {
+  content: "−";
+}
+
+.insights-summary:hover .insights-toggle,
+.insights-summary:focus-visible .insights-toggle {
+  color: var(--primary-text);
+}
+
+.insights-summary:focus-visible {
+  outline: 1px solid var(--primary-text);
+  outline-offset: 0.2rem;
+}
+
+.insights-list {
+  display: grid;
+  gap: 0.7rem;
+  padding-top: 1rem;
+}
+
+.insight-card {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  background: var(--device-background);
+  padding: 0.9rem 1rem;
+}
+
+.insight-question {
+  margin-bottom: 0.35rem;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.insight-placeholder {
+  margin-bottom: 0;
+  color: var(--secondary-text);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.saving-rate {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0.55rem 0 0.35rem;
+}
+
+.saving-rate strong {
+  font-size: 1.7rem;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+
+.saving-rate span,
+.saving-period,
+.saving-trend {
+  color: var(--secondary-text);
+  font-size: 0.64rem;
+}
+
+.saving-average {
+  margin-bottom: 0.16rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.saving-period {
+  margin-bottom: 0;
+}
+
+.saving-trend {
+  margin: 0.55rem 0 0;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.02em;
+}
+
+.goal-projection-list {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 0.55rem;
+}
+
+.goal-projection + .goal-projection {
+  border-top: 1px solid var(--display-border);
+  padding-top: 0.7rem;
+}
+
+.goal-projection p {
+  margin-bottom: 0;
+}
+
+.goal-projection-name {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.goal-projection-remaining,
+.goal-projection-empty,
+.goal-projection-date span {
+  color: var(--secondary-text);
+  font-size: 0.64rem;
+}
+
+.goal-projection-remaining {
+  margin-top: 0.2rem;
+}
+
+.goal-projection-date {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin-top: 0.32rem;
+}
+
+.goal-projection-date strong {
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.goal-projection-empty {
+  margin-top: 0.32rem;
+}
+
+.attention-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.55rem;
+}
+
+.attention-observation + .attention-observation {
+  border-top: 1px solid var(--display-border);
+  padding-top: 0.65rem;
+}
+
+.attention-observation p {
+  margin-bottom: 0;
+}
+
+.attention-title {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.attention-message,
+.attention-empty {
+  margin-top: 0.25rem;
+  color: var(--secondary-text);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
 .progress-segments {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
@@ -959,6 +1155,31 @@ h1 {
 
 .amount-entry input[aria-invalid="true"] {
   border-color: var(--primary-text);
+}
+
+.amount-form .regular-contribution-option {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.4rem 0 0;
+  color: var(--secondary-text);
+  cursor: pointer;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.48rem;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.regular-contribution-option input[type="checkbox"] {
+  width: 0.72rem;
+  height: 0.72rem;
+  margin: 0;
+  accent-color: var(--segment-fill);
+}
+
+.regular-contribution-option input[type="checkbox"]:focus-visible {
+  outline: 1px solid var(--primary-text);
+  outline-offset: 2px;
 }
 
 .amount-error {

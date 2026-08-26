@@ -1,4 +1,6 @@
+from calendar import month_name
 from collections.abc import Iterator
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -8,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from src import database
 from src.app import app
+from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope
 from src.orm.user import User
 
@@ -100,6 +103,28 @@ def test_envelope_page_renders(client: TestClient) -> None:
     assert response.headers["content-type"].startswith("text/html")
     assert "alice" in response.text
     assert "100,000" in response.text
+
+
+def test_insights_section_is_collapsed_and_contains_three_cards(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+    stylesheet = Path("src/static/envelope.css").read_text()
+
+    assert response.status_code == 200
+    details_tag = response.text.split('<details class="insights-section"', maxsplit=1)[1].split(
+        ">", maxsplit=1
+    )[0]
+    assert "open" not in details_tag
+    assert "Insights" in response.text
+    assert response.text.count('class="insight-card"') == 3
+    assert "How am I saving?" in response.text
+    assert "How close are my goals?" in response.text
+    assert "What needs attention?" in response.text
+    assert "No regular contribution history yet." in response.text
+    assert "No active savings goals right now." in response.text
+    assert ".insights-list" in stylesheet
+    assert "width: 100%;" in stylesheet
 
 
 def test_envelope_page_shows_envelope_data(client: TestClient) -> None:
@@ -248,13 +273,223 @@ def test_envelope_page_changes_current_amount(client: TestClient) -> None:
     ).json()
     amount_url = f"/users/{user.id}/envelopes/{envelope['id']}/amount"
 
-    increment_response = client.post(amount_url, data={"amount": 50, "operation": "increment"})
+    increment_response = client.post(
+        amount_url,
+        data={
+            "amount": 50,
+            "operation": "increment",
+            "regular_contribution": ["false", "true"],
+        },
+    )
     assert increment_response.status_code == 200
     assert client.get(f"/envelopes/{envelope['id']}").json()["current_amount"] == 150
+    contributions = Contribution.for_envelope(envelope["id"])
+    assert len(contributions) == 1
+    assert contributions[0].amount == 50
+    assert contributions[0].is_regular is True
+    assert contributions[0].contributed_at is not None
 
     decrement_response = client.post(amount_url, data={"amount": 25, "operation": "decrement"})
     assert decrement_response.status_code == 200
     assert client.get(f"/envelopes/{envelope['id']}").json()["current_amount"] == 125
+    assert len(Contribution.for_envelope(envelope["id"])) == 1
+
+
+def test_add_money_shows_regular_contribution_checked_by_default(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Emergency fund",
+        target_amount=1_000,
+        priority=1,
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert response.text.count("Regular contribution") == 1
+    checkbox = response.text.split('name="regular_contribution"', maxsplit=2)[2].split(
+        ">", maxsplit=1
+    )[0]
+    assert 'type="checkbox"' in checkbox
+    assert "checked" in checkbox
+    assert f"amount-increment-{envelope.id}" in response.text
+
+
+def test_non_regular_contribution_is_persisted(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Emergency fund",
+        current_amount=100,
+        target_amount=1_000,
+        priority=1,
+    )
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/{envelope.id}/amount",
+        data={
+            "amount": "40",
+            "operation": "increment",
+            "regular_contribution": "false",
+        },
+    )
+
+    assert response.status_code == 200
+    stored_envelope = Envelope.get(envelope.id)
+    assert stored_envelope is not None
+    assert stored_envelope.current_amount == 140
+    contributions = Contribution.for_envelope(envelope.id)
+    assert len(contributions) == 1
+    assert contributions[0].amount == 40
+    assert contributions[0].is_regular is False
+    assert contributions[0].contributed_at is not None
+
+
+def test_saving_insight_combines_regular_contributions_from_all_envelopes(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_000)
+    first_envelope = Envelope.create(
+        user_id=user.id,
+        name="Emergency fund",
+        target_amount=10_000,
+        priority=1,
+    )
+    second_envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        target_amount=5_000,
+        priority=2,
+    )
+    current_month = date.today().replace(day=1)
+    current_month_index = current_month.year * 12 + current_month.month - 1
+
+    for offset, envelope_id, amount in [
+        (-3, first_envelope.id, 100),
+        (-2, second_envelope.id, 200),
+        (-1, first_envelope.id, 300),
+    ]:
+        year, zero_based_month = divmod(current_month_index + offset, 12)
+        Contribution.create(
+            envelope_id=envelope_id,
+            amount=amount,
+            is_regular=True,
+            contributed_at=datetime(year, zero_based_month + 1, 10),
+        )
+
+    previous_year, previous_month = divmod(current_month_index - 1, 12)
+    Contribution.create(
+        envelope_id=second_envelope.id,
+        amount=9_000,
+        is_regular=False,
+        contributed_at=datetime(previous_year, previous_month + 1, 12),
+    )
+    Contribution.create(
+        envelope_id=second_envelope.id,
+        amount=8_000,
+        is_regular=True,
+        contributed_at=datetime(current_month.year, current_month.month, 1),
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert '<strong>20%</strong>' in response.text
+    assert "€200/month on average" in response.text
+    assert "over the last 3 complete" in response.text
+    assert "months" in response.text
+    assert "9,000/month" not in response.text
+
+
+def test_goal_projections_use_each_envelopes_regular_contributions(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_000)
+    projected = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=3_800,
+        target_amount=5_000,
+        priority=1,
+    )
+    no_history = Envelope.create(
+        user_id=user.id,
+        name="Camera",
+        current_amount=200,
+        target_amount=1_000,
+        priority=2,
+    )
+    Envelope.create(
+        user_id=user.id,
+        name="Completed",
+        current_amount=1_000,
+        target_amount=1_000,
+        priority=3,
+    )
+    current_month = date.today().replace(day=1)
+    current_month_index = current_month.year * 12 + current_month.month - 1
+
+    for offset in range(-3, 0):
+        year, zero_based_month = divmod(current_month_index + offset, 12)
+        Contribution.create(
+            envelope_id=projected.id,
+            amount=400,
+            is_regular=True,
+            contributed_at=datetime(year, zero_based_month + 1, 10),
+        )
+
+    previous_year, previous_month = divmod(current_month_index - 1, 12)
+    Contribution.create(
+        envelope_id=projected.id,
+        amount=3_000,
+        is_regular=False,
+        contributed_at=datetime(previous_year, previous_month + 1, 12),
+    )
+
+    completion_year, completion_month_index = divmod(current_month_index + 3, 12)
+    expected_completion = f"{month_name[completion_month_index + 1]} {completion_year}"
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert "Trip" in response.text
+    assert "€1,200 to go" in response.text
+    assert f"<strong>{expected_completion}</strong>" in response.text
+    assert "Camera" in response.text
+    assert "€800 to go" in response.text
+    assert "Not enough data to estimate yet." in response.text
+    insights_html = response.text.split('<div class="insights-list">', maxsplit=1)[1]
+    assert "Completed" not in insights_html
+    assert no_history.current_amount == 200
+
+
+def test_attention_insight_is_rendered_for_specific_pace_drop(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_000)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=100,
+        target_amount=1_000,
+        priority=1,
+    )
+    current_month = date.today().replace(day=1)
+    current_month_index = current_month.year * 12 + current_month.month - 1
+    for offset, amount in [(-6, 200), (-5, 200), (-4, 200), (-3, 100), (-2, 100), (-1, 100)]:
+        year, zero_based_month = divmod(current_month_index + offset, 12)
+        Contribution.create(
+            envelope_id=envelope.id,
+            amount=amount,
+            is_regular=True,
+            contributed_at=datetime(year, zero_based_month + 1, 1),
+        )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert "What needs attention?" in response.text
+    assert "Trip" in response.text
+    assert "Your recent saving pace is 50% lower than in the previous 3 months." in response.text
+    assert "Nothing needs your attention right now." not in response.text
 
 
 def test_decrement_below_zero_renders_local_amount_error(client: TestClient) -> None:

@@ -44,7 +44,20 @@ def test_existing_envelopes_become_regular_after_migration(tmp_path: Path) -> No
         migrated_envelope = connection.execute(
             text("SELECT kind, target_amount, pillow_index FROM envelopes WHERE id = 1")
         ).one()
+        connection.execute(
+            text("INSERT INTO contributions (envelope_id, amount) VALUES (1, 100)")
+        )
+        contribution = connection.execute(
+            text(
+                "SELECT envelope_id, amount, is_regular, contributed_at "
+                "FROM contributions WHERE id = 1"
+            )
+        ).one()
 
     assert migrated_envelope.kind == "regular"
     assert migrated_envelope.target_amount == 1_200
     assert migrated_envelope.pillow_index == 2
+    assert contribution.envelope_id == 1
+    assert contribution.amount == 100
+    assert contribution.is_regular == 1
+    assert contribution.contributed_at is not None

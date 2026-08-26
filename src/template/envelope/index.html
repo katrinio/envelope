@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=envelope-delete-dialog-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=attention-insight-1">
     <script src="{{ url_for('static', path='/envelope.js') }}?v=envelope-delete-dialog-1" defer></script>
   </head>
   <body>
@@ -239,6 +239,18 @@
                       >
                       <button name="operation" value="{{ operation }}" type="submit">OK</button>
                     </div>
+                    {% if operation == 'increment' %}
+                      <label class="regular-contribution-option">
+                        <input name="regular_contribution" type="hidden" value="false">
+                        <input
+                          name="regular_contribution"
+                          type="checkbox"
+                          value="true"
+                          {% if not has_amount_error or amount_form.is_regular %}checked{% endif %}
+                        >
+                        <span>Regular contribution</span>
+                      </label>
+                    {% endif %}
                     {% if has_amount_error %}
                       <p class="amount-error" id="amount-error-{{ operation }}-{{ item.envelope.id }}">
                         {{ amount_form.error }}
@@ -351,6 +363,79 @@
           </div>
         </details>
       </section>
+
+      <details class="insights-section">
+        <summary class="insights-summary">
+          <h2>Insights</h2>
+          <span class="insights-toggle" aria-hidden="true"></span>
+        </summary>
+        <div class="insights-list">
+          <article class="insight-card">
+            <p class="insight-question">How am I saving?</p>
+            {% if saving_insight %}
+              <p class="saving-rate">
+                <strong>{{ saving_insight.average_saving_rate }}%</strong>
+                <span>of your salary</span>
+              </p>
+              <p class="saving-average">
+                €{{ "{:,}".format(saving_insight.average_monthly_amount) }}/month on average
+              </p>
+              <p class="saving-period">
+                over the last {{ saving_insight.months_count }} complete
+                {{ "month" if saving_insight.months_count == 1 else "months" }}
+              </p>
+              {% if saving_insight.trend_message %}
+                <p class="saving-trend">{{ saving_insight.trend_message }}</p>
+              {% endif %}
+            {% else %}
+              <p class="insight-placeholder">No regular contribution history yet.</p>
+            {% endif %}
+          </article>
+          <article class="insight-card">
+            <p class="insight-question">How close are my goals?</p>
+            {% if goal_projections %}
+              <div class="goal-projection-list">
+                {% for projection in goal_projections %}
+                  <section class="goal-projection">
+                    <p class="goal-projection-name">{{ projection.envelope_name }}</p>
+                    <p class="goal-projection-remaining">
+                      €{{ "{:,}".format(projection.remaining_amount) }} to go
+                    </p>
+                    {% if projection.completion_month %}
+                      <p class="goal-projection-date">
+                        <span>At your current pace:</span>
+                        <strong>{{ projection.completion_month }}</strong>
+                      </p>
+                    {% else %}
+                      <p class="goal-projection-empty">Not enough data to estimate yet.</p>
+                    {% endif %}
+                  </section>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="insight-placeholder">No active savings goals right now.</p>
+            {% endif %}
+          </article>
+          <article class="insight-card">
+            <p class="insight-question">What needs attention?</p>
+            {% if attention_observations %}
+              <div class="attention-list">
+                {% for observation in attention_observations %}
+                  <section class="attention-observation">
+                    <p class="attention-title">{{ observation.title }}</p>
+                    <p class="attention-message">{{ observation.message }}</p>
+                  </section>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="attention-empty">
+                Nothing needs your attention right now.<br>
+                Your saving pattern looks consistent.
+              </p>
+            {% endif %}
+          </article>
+        </div>
+      </details>
     </main>
 
     <dialog

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
@@ -7,8 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.envelope.service import (
     FINANCIAL_PILLOW_SALARY_MULTIPLIER,
+    GoalHistory,
+    calculate_attention_observations,
     calculate_financial_pillow_target,
+    calculate_goal_projection,
+    calculate_saving_insight,
 )
+from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope, EnvelopeKind
 from src.orm.user import User
 from src.template import templates
@@ -97,6 +103,7 @@ class EnvelopeAmountForm:
     envelope_id: int
     operation: Literal["increment", "decrement"]
     amount: str
+    is_regular: bool
     error: str
 
 
@@ -146,10 +153,45 @@ def _render_envelope_page(
     status_code: int = status.HTTP_200_OK,
 ) -> Response:
     envelopes = Envelope.for_user(user.id)
+    regular_contributions = Contribution.regular_for_user(user.id)
+    contributions_by_envelope: dict[int, list[tuple[int, datetime]]] = {}
+    for contribution in regular_contributions:
+        contributions_by_envelope.setdefault(contribution.envelope_id, []).append(
+            (contribution.amount, contribution.contributed_at)
+        )
+    saving_insight = calculate_saving_insight(
+        user.salary,
+        (
+            (contribution.amount, contribution.contributed_at)
+            for contribution in regular_contributions
+        ),
+    )
     envelope_items = []
+    goal_projections = []
+    goal_histories: list[GoalHistory] = []
     for envelope in envelopes:
         target_amount = envelope.target_amount
         progress_percentage = _calculate_progress_percentage(envelope, target_amount)
+        goal_histories.append(
+            GoalHistory(
+                envelope_id=envelope.id,
+                envelope_name=envelope.name,
+                current_amount=envelope.current_amount,
+                target_amount=target_amount,
+                regular_contributions=tuple(
+                    contributions_by_envelope.get(envelope.id, [])
+                ),
+            )
+        )
+        goal_projection = calculate_goal_projection(
+            envelope_id=envelope.id,
+            envelope_name=envelope.name,
+            current_amount=envelope.current_amount,
+            target_amount=target_amount,
+            regular_contributions=contributions_by_envelope.get(envelope.id, []),
+        )
+        if goal_projection is not None:
+            goal_projections.append(goal_projection)
         envelope_items.append(
             EnvelopePageItem(
                 envelope=envelope,
@@ -159,6 +201,7 @@ def _render_envelope_page(
                 status_message=_envelope_status(envelope, target_amount, progress_percentage),
             )
         )
+    attention_observations = calculate_attention_observations(user.salary, goal_histories)
     return templates.TemplateResponse(
         request,
         "envelope/index.html",
@@ -170,6 +213,9 @@ def _render_envelope_page(
             "edit_form": edit_form,
             "amount_form": amount_form,
             "salary_form": salary_form,
+            "saving_insight": saving_insight,
+            "goal_projections": goal_projections,
+            "attention_observations": attention_observations,
             "has_financial_pillow": any(envelope.is_financial_pillow for envelope in envelopes),
             "financial_pillow_target": (
                 calculate_financial_pillow_target(
@@ -485,6 +531,7 @@ def change_envelope_amount(
     envelope_id: int,
     operation: Annotated[Literal["increment", "decrement"], Form()],
     amount: Annotated[str, Form()] = "",
+    regular_contribution: Annotated[bool, Form()] = True,
 ) -> Response:
     user = User.get(user_id)
     if user is None:
@@ -501,10 +548,15 @@ def change_envelope_amount(
     else:
         if parsed_amount <= 0:
             error_message = "Use an amount above 0."
+        elif operation == "increment":
+            Contribution.add_to_envelope(
+                envelope_id=envelope.id,
+                amount=parsed_amount,
+                is_regular=regular_contribution,
+            )
         else:
-            delta = parsed_amount if operation == "increment" else -parsed_amount
             try:
-                _set_current_amount(envelope, envelope.current_amount + delta)
+                _set_current_amount(envelope, envelope.current_amount - parsed_amount)
             except ValueError:
                 error_message = "Saved amount cannot go below €0."
 
@@ -516,6 +568,7 @@ def change_envelope_amount(
                 envelope_id=envelope_id,
                 operation=operation,
                 amount=amount,
+                is_regular=regular_contribution,
                 error=error_message,
             ),
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
