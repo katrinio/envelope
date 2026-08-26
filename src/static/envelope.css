@@ -825,6 +825,291 @@ h1 {
   opacity: 0.55;
 }
 
+.history-dialog {
+  position: fixed;
+  z-index: 10;
+  top: 50%;
+  left: 50%;
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  margin: 0;
+  transform: translate(-50%, -50%);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  color: var(--primary-text);
+  background: var(--device-background);
+  padding: 0;
+}
+
+.history-dialog::backdrop {
+  background: rgb(42 41 37 / 18%);
+}
+
+.history-dialog-content {
+  padding: 1rem;
+}
+
+.history-dialog-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.65rem;
+}
+
+.history-dialog-title,
+.history-day-label,
+.history-edit-title {
+  margin: 0;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.history-dialog-close,
+.history-transaction-actions a,
+.history-delete summary {
+  color: var(--secondary-text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.52rem;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.history-dialog-close:hover,
+.history-dialog-close:focus-visible,
+.history-transaction-actions a:hover,
+.history-transaction-actions a:focus-visible,
+.history-delete summary:hover,
+.history-delete summary:focus-visible {
+  color: var(--primary-text);
+}
+
+.history-list {
+  display: grid;
+  gap: 1rem;
+  padding-top: 0.9rem;
+}
+
+.history-day-label {
+  margin-bottom: 0.4rem;
+  color: var(--secondary-text);
+  font-size: 0.55rem;
+}
+
+.history-day ul {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-transaction {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-top: 1px solid var(--display-border);
+  padding-top: 0.35rem;
+}
+
+.history-transaction-main {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.history-sign {
+  width: 0.7rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.history-amount {
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.history-kind {
+  color: var(--secondary-text);
+  font-size: 0.62rem;
+}
+
+.history-transaction-actions {
+  display: flex;
+  align-items: baseline;
+  flex-shrink: 0;
+  gap: 0.45rem;
+}
+
+.history-delete {
+  position: relative;
+}
+
+.history-delete summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.history-delete summary::-webkit-details-marker {
+  display: none;
+}
+
+.history-delete-confirmation {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  width: 13rem;
+  border: 1px solid var(--border);
+  background: var(--display-background);
+  padding: 0.55rem;
+}
+
+.history-delete-confirmation p {
+  margin: 0 0 0.45rem;
+  color: var(--secondary-text);
+  font-size: 0.6rem;
+  line-height: 1.35;
+}
+
+.history-delete-confirmation form {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.history-delete-confirmation button,
+.history-delete-confirmation a {
+  border: 0;
+  color: var(--secondary-text);
+  background: transparent;
+  padding: 0.2rem;
+  cursor: pointer;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.5rem;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.history-delete-confirmation button {
+  border: 1px solid var(--border);
+  color: var(--primary-text);
+}
+
+.history-delete-confirmation button:hover,
+.history-delete-confirmation button:focus-visible,
+.history-delete-confirmation a:hover,
+.history-delete-confirmation a:focus-visible {
+  color: var(--primary-text);
+  background: var(--control-background);
+}
+
+.history-edit-form {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 0.9rem;
+}
+
+.history-edit-title {
+  margin-bottom: 0.25rem;
+}
+
+.history-edit-form > label,
+.history-regular-option {
+  color: var(--secondary-text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.54rem;
+  text-transform: uppercase;
+}
+
+.history-edit-form input[type="number"],
+.history-edit-form input[type="date"] {
+  width: 100%;
+  height: 1.65rem;
+  border: 1px solid var(--display-border);
+  border-radius: 0.15rem;
+  color: var(--primary-text);
+  background: var(--control-background);
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
+}
+
+.history-edit-amount {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.history-edit-amount span {
+  color: var(--secondary-text);
+  font-size: 0.75rem;
+}
+
+.history-regular-option {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+  cursor: pointer;
+  text-transform: none;
+}
+
+.history-regular-option input {
+  accent-color: var(--segment-fill);
+}
+
+.history-edit-error,
+.history-empty,
+.attention-empty {
+  color: var(--secondary-text);
+  font-size: 0.62rem;
+}
+
+.history-edit-error {
+  margin: 0.2rem 0 0;
+}
+
+.history-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.history-edit-actions a,
+.history-edit-actions button {
+  border: 0;
+  color: var(--secondary-text);
+  background: transparent;
+  padding: 0.25rem 0.35rem;
+  cursor: pointer;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.55rem;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.history-edit-actions button {
+  border: 1px solid var(--border);
+  color: var(--primary-text);
+}
+
+.history-edit-actions a:hover,
+.history-edit-actions a:focus-visible,
+.history-edit-actions button:hover,
+.history-edit-actions button:focus-visible {
+  color: var(--primary-text);
+  background: var(--control-background);
+}
+
 .insights-section {
   margin-top: 3rem;
 }

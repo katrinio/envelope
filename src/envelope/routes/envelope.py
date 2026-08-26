@@ -1,5 +1,6 @@
+from calendar import month_name
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
@@ -113,6 +114,21 @@ class SalaryForm:
     error: str
 
 
+@dataclass(frozen=True)
+class HistoryDay:
+    label: str
+    transactions: list[Contribution]
+
+
+@dataclass(frozen=True)
+class HistoryEditForm:
+    transaction_id: int
+    amount: str
+    transaction_date: str
+    is_regular: bool
+    error: str | None = None
+
+
 def _get_envelope_or_404(envelope_id: int) -> Envelope:
     envelope = Envelope.get(envelope_id)
     if envelope is None:
@@ -150,6 +166,9 @@ def _render_envelope_page(
     edit_form: EnvelopeEditForm | None = None,
     amount_form: EnvelopeAmountForm | None = None,
     salary_form: SalaryForm | None = None,
+    history_envelope_id: int | None = None,
+    history_edit_transaction: Contribution | None = None,
+    history_edit_form: HistoryEditForm | None = None,
     status_code: int = status.HTTP_200_OK,
 ) -> Response:
     envelopes = Envelope.for_user(user.id)
@@ -202,6 +221,20 @@ def _render_envelope_page(
             )
         )
     attention_observations = calculate_attention_observations(user.salary, goal_histories)
+    history_days: list[HistoryDay] = []
+    if history_envelope_id is not None:
+        history_transactions = Contribution.newest_first_for_envelope(history_envelope_id)
+        grouped_transactions: dict[date, list[Contribution]] = {}
+        for transaction in history_transactions:
+            transaction_date = transaction.contributed_at.date()
+            grouped_transactions.setdefault(transaction_date, []).append(transaction)
+        history_days = [
+            HistoryDay(
+                label=f"{month_name[transaction_date.month].upper()} {transaction_date.day}",
+                transactions=transactions,
+            )
+            for transaction_date, transactions in grouped_transactions.items()
+        ]
     return templates.TemplateResponse(
         request,
         "envelope/index.html",
@@ -216,6 +249,10 @@ def _render_envelope_page(
             "saving_insight": saving_insight,
             "goal_projections": goal_projections,
             "attention_observations": attention_observations,
+            "history_envelope_id": history_envelope_id,
+            "history_days": history_days,
+            "history_edit_transaction": history_edit_transaction,
+            "history_edit_form": history_edit_form,
             "has_financial_pillow": any(envelope.is_financial_pillow for envelope in envelopes),
             "financial_pillow_target": (
                 calculate_financial_pillow_target(
@@ -308,6 +345,8 @@ def view_user_envelopes(
     request: Request,
     user_id: int,
     edit_envelope_id: int | None = None,
+    history_envelope_id: int | None = None,
+    edit_transaction_id: int | None = None,
 ) -> Response:
     user = User.get(user_id)
     if user is None:
@@ -318,10 +357,31 @@ def view_user_envelopes(
         if envelope.user_id != user_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Envelope not found")
 
+    history_edit_transaction: Contribution | None = None
+    history_edit_form: HistoryEditForm | None = None
+    if history_envelope_id is not None:
+        history_envelope = _get_envelope_or_404(history_envelope_id)
+        if history_envelope.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Envelope not found")
+        if edit_transaction_id is not None:
+            transaction = Contribution.get(edit_transaction_id)
+            if transaction is None or transaction.envelope_id != history_envelope_id:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+            history_edit_transaction = transaction
+            history_edit_form = HistoryEditForm(
+                transaction_id=transaction.id,
+                amount=str(transaction.amount),
+                transaction_date=transaction.contributed_at.date().isoformat(),
+                is_regular=transaction.is_regular,
+            )
+
     return _render_envelope_page(
         request,
         user,
         editing_envelope_id=edit_envelope_id,
+        history_envelope_id=history_envelope_id,
+        history_edit_transaction=history_edit_transaction,
+        history_edit_form=history_edit_form,
     )
 
 
@@ -549,16 +609,19 @@ def change_envelope_amount(
         if parsed_amount <= 0:
             error_message = "Use an amount above 0."
         elif operation == "increment":
-            Contribution.add_to_envelope(
-                envelope_id=envelope.id,
-                amount=parsed_amount,
-                is_regular=regular_contribution,
-            )
+            try:
+                Contribution.add_to_envelope(
+                    envelope_id=envelope.id,
+                    amount=parsed_amount,
+                    is_regular=regular_contribution,
+                )
+            except ValueError as error:
+                error_message = str(error)
         else:
             try:
-                _set_current_amount(envelope, envelope.current_amount - parsed_amount)
-            except ValueError:
-                error_message = "Saved amount cannot go below €0."
+                Contribution.withdraw_from_envelope(envelope.id, parsed_amount)
+            except ValueError as error:
+                error_message = str(error)
 
     if error_message is not None:
         return _render_envelope_page(
@@ -576,5 +639,116 @@ def change_envelope_amount(
 
     return RedirectResponse(
         request.url_for("view_user_envelopes", user_id=user_id),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+def _history_page_url(request: Request, user_id: int, envelope_id: int) -> str:
+    return f"{request.url_for('view_user_envelopes', user_id=user_id)}?history_envelope_id={envelope_id}"
+
+
+@router.post(
+    "/users/{user_id}/envelopes/{envelope_id}/history/{transaction_id}/edit",
+    response_class=HTMLResponse,
+    name="edit_transaction_from_page",
+)
+def edit_transaction_from_page(
+    request: Request,
+    user_id: int,
+    envelope_id: int,
+    transaction_id: int,
+    amount: Annotated[str, Form()] = "",
+    transaction_date: Annotated[str, Form()] = "",
+    regular_contribution: Annotated[bool, Form()] = False,
+) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    envelope = _get_envelope_or_404(envelope_id)
+    if envelope.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Envelope not found")
+    transaction = Contribution.get(transaction_id)
+    if transaction is None or transaction.envelope_id != envelope_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+
+    error_message: str | None = None
+    try:
+        parsed_amount = int(amount)
+    except ValueError:
+        error_message = "Enter a whole amount."
+    else:
+        if parsed_amount <= 0:
+            error_message = "Use an amount above 0."
+
+    parsed_date: datetime | None = None
+    try:
+        parsed_date = datetime.strptime(transaction_date, "%Y-%m-%d").replace(hour=12)
+    except ValueError:
+        if error_message is None:
+            error_message = "Choose a valid date."
+
+    if error_message is None and parsed_date is not None:
+        try:
+            transaction.update_transaction(
+                amount=parsed_amount,
+                contributed_at=parsed_date,
+                is_regular=regular_contribution,
+            )
+        except ValueError as error:
+            error_message = str(error)
+
+    if error_message is not None:
+        return _render_envelope_page(
+            request,
+            user,
+            history_envelope_id=envelope_id,
+            history_edit_transaction=transaction,
+            history_edit_form=HistoryEditForm(
+                transaction_id=transaction_id,
+                amount=amount,
+                transaction_date=transaction_date,
+                is_regular=regular_contribution,
+                error=error_message,
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
+
+    return RedirectResponse(
+        _history_page_url(request, user_id, envelope_id),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/users/{user_id}/envelopes/{envelope_id}/history/{transaction_id}/delete",
+    response_class=HTMLResponse,
+    name="delete_transaction_from_page",
+)
+def delete_transaction_from_page(
+    request: Request,
+    user_id: int,
+    envelope_id: int,
+    transaction_id: int,
+) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    envelope = _get_envelope_or_404(envelope_id)
+    if envelope.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Envelope not found")
+    transaction = Contribution.get(transaction_id)
+    if transaction is None or transaction.envelope_id != envelope_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+
+    try:
+        transaction.delete_transaction()
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+    return RedirectResponse(
+        _history_page_url(request, user_id, envelope_id),
         status_code=status.HTTP_303_SEE_OTHER,
     )

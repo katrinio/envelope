@@ -24,6 +24,7 @@ class Envelope(Base):
     __tablename__ = "envelopes"
     __table_args__ = (
         CheckConstraint("current_amount >= 0", name="ck_envelopes_current_amount_non_negative"),
+        CheckConstraint("opening_amount >= 0", name="ck_envelopes_opening_amount_non_negative"),
         CheckConstraint(
             "(kind = 'regular' AND target_amount > 0) OR "
             "(kind = 'financial_pillow' AND target_amount IS NULL)",
@@ -48,6 +49,7 @@ class Envelope(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(255))
     current_amount: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    opening_amount: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     _target_amount: Mapped[int | None] = mapped_column("target_amount", Integer, nullable=True)
     priority: Mapped[int] = mapped_column(Integer)
     kind: Mapped[str] = mapped_column(String(32), default=EnvelopeKind.REGULAR, server_default="regular")
