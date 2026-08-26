@@ -16,81 +16,136 @@
         </div>
       </header>
 
-      {% if envelope_items %}
-        <section class="envelope-grid" aria-label="Savings envelopes">
-          {% for item in envelope_items %}
-            <article class="envelope-device">
-              <div class="device-screen">
-                <header class="device-heading">
-                  <h2>{{ item.envelope.name }}</h2>
-                  <span class="percentage">{{ item.progress_percentage }}%</span>
-                </header>
+      <section class="envelope-grid" aria-label="Savings envelopes">
+        {% for item in envelope_items %}
+          <article class="envelope-device">
+            <div class="device-screen">
+              <header class="device-heading">
+                <h2>{{ item.envelope.name }}</h2>
+                <span class="percentage">{{ item.progress_percentage }}%</span>
+              </header>
 
-                <div
-                  class="progress-segments"
-                  role="progressbar"
-                  aria-label="{{ item.envelope.name }} progress"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  aria-valuenow="{{ item.progress_percentage }}"
-                  data-progress="{{ item.progress_percentage }}"
-                >
-                  {% for segment in range(1, 11) %}
-                    <span
-                      class="progress-segment{% if segment <= item.filled_segments %} is-filled{% endif %}"
-                      aria-hidden="true"
-                    ></span>
-                  {% endfor %}
-                </div>
-
-                <p class="amounts">
-                  <strong>€{{ "{:,}".format(item.envelope.current_amount) }}</strong>
-                  <span>/ €{{ "{:,}".format(item.envelope.target_amount) }}</span>
-                </p>
-                <p class="device-status">{{ item.status_message }}</p>
-              </div>
-
-              <div class="device-controls" aria-label="Change saved amount">
-                {% for operation, symbol, label in [
-                  ('decrement', '−', 'Decrease amount'),
-                  ('increment', '+', 'Increase amount')
-                ] %}
-                  <details class="adjustment-control">
-                    <summary aria-label="{{ label }}">{{ symbol }}</summary>
-                    <form
-                      class="amount-form"
-                      action="{{ url_for('change_envelope_amount', user_id=user.id, envelope_id=item.envelope.id) }}"
-                      method="post"
-                    >
-                      <label for="amount-{{ operation }}-{{ item.envelope.id }}">{{ label }}</label>
-                      <div class="amount-entry">
-                        <span aria-hidden="true">€</span>
-                        <input
-                          id="amount-{{ operation }}-{{ item.envelope.id }}"
-                          name="amount"
-                          type="number"
-                          min="1"
-                          step="1"
-                          inputmode="numeric"
-                          placeholder="0"
-                          required
-                        >
-                        <button name="operation" value="{{ operation }}" type="submit">OK</button>
-                      </div>
-                    </form>
-                  </details>
+              <div
+                class="progress-segments"
+                role="progressbar"
+                aria-label="{{ item.envelope.name }} progress"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="{{ item.progress_percentage }}"
+                data-progress="{{ item.progress_percentage }}"
+              >
+                {% for segment in range(1, 11) %}
+                  <span
+                    class="progress-segment{% if segment <= item.filled_segments %} is-filled{% endif %}"
+                    aria-hidden="true"
+                  ></span>
                 {% endfor %}
               </div>
-            </article>
-          {% endfor %}
-        </section>
-      {% else %}
-        <section class="empty-state">
-          <p class="empty-symbol" aria-hidden="true">□ □ □</p>
-          <h2>No envelopes yet</h2>
-          <p>Your long-term savings envelopes will appear here.</p>
-        </section>
-      {% endif %}
+
+              <p class="amounts">
+                <strong>€{{ "{:,}".format(item.envelope.current_amount) }}</strong>
+                <span>/ €{{ "{:,}".format(item.envelope.target_amount) }}</span>
+              </p>
+              <p class="device-status">{{ item.status_message }}</p>
+            </div>
+
+            <div class="device-controls" aria-label="Change saved amount">
+              {% for operation, symbol, label in [
+                ('decrement', '−', 'Decrease amount'),
+                ('increment', '+', 'Increase amount')
+              ] %}
+                <details class="adjustment-control">
+                  <summary aria-label="{{ label }}">{{ symbol }}</summary>
+                  <form
+                    class="amount-form"
+                    action="{{ url_for('change_envelope_amount', user_id=user.id, envelope_id=item.envelope.id) }}"
+                    method="post"
+                  >
+                    <label for="amount-{{ operation }}-{{ item.envelope.id }}">{{ label }}</label>
+                    <div class="amount-entry">
+                      <span aria-hidden="true">€</span>
+                      <input
+                        id="amount-{{ operation }}-{{ item.envelope.id }}"
+                        name="amount"
+                        type="number"
+                        min="1"
+                        step="1"
+                        inputmode="numeric"
+                        placeholder="0"
+                        required
+                      >
+                      <button name="operation" value="{{ operation }}" type="submit">OK</button>
+                    </div>
+                  </form>
+                </details>
+              {% endfor %}
+            </div>
+          </article>
+        {% endfor %}
+
+        <details class="creation-device"{% if creation_form %} open{% endif %}>
+          <summary class="creation-trigger" aria-label="Create a new envelope">
+            <span class="creation-plus" aria-hidden="true">+</span>
+            <span>New envelope</span>
+          </summary>
+
+          <div class="creation-panel">
+            <p class="creation-title">New envelope</p>
+            <form
+              class="creation-form"
+              action="{{ url_for('create_envelope_from_page', user_id=user.id) }}"
+              method="post"
+              novalidate
+            >
+              <div class="creation-field">
+                <label for="new-envelope-name">Name</label>
+                <input
+                  id="new-envelope-name"
+                  name="name"
+                  type="text"
+                  maxlength="255"
+                  value="{{ creation_form.name if creation_form else '' }}"
+                  aria-invalid="{{ 'true' if creation_form and creation_form.errors.get('name') else 'false' }}"
+                  {% if creation_form and creation_form.errors.get('name') %}
+                    aria-describedby="new-envelope-name-error"
+                  {% endif %}
+                >
+                {% if creation_form and creation_form.errors.get('name') %}
+                  <p class="field-error" id="new-envelope-name-error">{{ creation_form.errors.name }}</p>
+                {% endif %}
+              </div>
+
+              <div class="creation-field">
+                <label for="new-envelope-target">Goal</label>
+                <div class="goal-entry">
+                  <span aria-hidden="true">€</span>
+                  <input
+                    id="new-envelope-target"
+                    name="target_amount"
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputmode="numeric"
+                    value="{{ creation_form.target_amount if creation_form else '' }}"
+                    aria-invalid="{{ 'true' if creation_form and creation_form.errors.get('target_amount') else 'false' }}"
+                    {% if creation_form and creation_form.errors.get('target_amount') %}
+                      aria-describedby="new-envelope-target-error"
+                    {% endif %}
+                  >
+                </div>
+                {% if creation_form and creation_form.errors.get('target_amount') %}
+                  <p class="field-error" id="new-envelope-target-error">{{ creation_form.errors.target_amount }}</p>
+                {% endif %}
+              </div>
+
+              <div class="creation-actions">
+                <a href="{{ url_for('view_user_envelopes', user_id=user.id) }}">Cancel</a>
+                <button type="submit">Create</button>
+              </div>
+            </form>
+          </div>
+        </details>
+      </section>
     </main>
   </body>
 </html>

@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from src import database
 from src.app import app
+from src.orm.envelope import Envelope
 from src.orm.user import User
 
 
@@ -139,14 +140,103 @@ def test_envelope_page_progress_calculation(client: TestClient) -> None:
     assert response.text.count('class="progress-segment is-filled"') == 2
 
 
-def test_envelope_page_empty_state(client: TestClient) -> None:
+def test_creation_tile_is_rendered_without_envelopes(client: TestClient) -> None:
     user = User.create(userId=1, username="alice", salary=100_000)
 
     response = client.get(f"/users/{user.id}/envelopes/page")
 
     assert response.status_code == 200
-    assert "No envelopes yet" in response.text
-    assert 'aria-label="Savings envelopes"' not in response.text
+    assert 'class="creation-device"' in response.text
+    assert "New envelope" in response.text
+    assert 'class="envelope-device"' not in response.text
+
+
+def test_creation_tile_is_rendered_after_existing_envelopes(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        target_amount=1_200,
+        priority=1,
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert response.text.index("Trip") < response.text.index("New envelope")
+
+
+def test_valid_envelope_is_created_and_displayed(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/create",
+        data={"name": "  Trip  ", "target_amount": "1200"},
+    )
+
+    assert response.status_code == 200
+    assert "Trip" in response.text
+    assert "€1,200" in response.text
+    envelopes = Envelope.for_user(user.id)
+    assert len(envelopes) == 1
+    assert envelopes[0].name == "Trip"
+    assert envelopes[0].target_amount == 1_200
+    assert envelopes[0].priority == 1
+    assert response.text.index("Trip") < response.text.index("New envelope")
+
+
+@pytest.mark.parametrize("name", ["", "   "])
+def test_envelope_creation_requires_name(client: TestClient, name: str) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/create",
+        data={"name": name, "target_amount": "1200"},
+    )
+
+    assert response.status_code == 422
+    assert "Add a name." in response.text
+    assert '<details class="creation-device" open>' in response.text
+    assert Envelope.for_user(user.id) == []
+
+
+@pytest.mark.parametrize(
+    ("target_amount", "message"),
+    [("0", "Use an amount above 0."), ("-1", "Use an amount above 0."), ("abc", "Enter a whole amount.")],
+)
+def test_envelope_creation_validates_target_amount(
+    client: TestClient,
+    target_amount: str,
+    message: str,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/create",
+        data={"name": "Trip", "target_amount": target_amount},
+    )
+
+    assert response.status_code == 422
+    assert message in response.text
+    assert Envelope.for_user(user.id) == []
+
+
+def test_envelope_creation_can_be_cancelled(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    page_url = f"/users/{user.id}/envelopes/page"
+    invalid_response = client.post(
+        f"/users/{user.id}/envelopes/create",
+        data={"name": "Trip", "target_amount": "0"},
+    )
+    assert 'value="Trip"' in invalid_response.text
+    assert f'href="http://testserver{page_url}"' in invalid_response.text
+
+    cancel_response = client.get(page_url)
+
+    assert cancel_response.status_code == 200
+    assert '<details class="creation-device" open>' not in cancel_response.text
+    assert 'value="Trip"' not in cancel_response.text
+    assert Envelope.for_user(user.id) == []
 
 
 def test_envelope_page_changes_current_amount(client: TestClient) -> None:

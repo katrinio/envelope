@@ -42,6 +42,13 @@ class EnvelopePageItem:
     status_message: str
 
 
+@dataclass(frozen=True)
+class EnvelopeCreationForm:
+    name: str
+    target_amount: str
+    errors: dict[str, str]
+
+
 def _get_envelope_or_404(envelope_id: int) -> Envelope:
     envelope = Envelope.get(envelope_id)
     if envelope is None:
@@ -65,6 +72,35 @@ def _envelope_status(envelope: Envelope, progress_percentage: int) -> str:
     if progress_percentage >= 85:
         return "almost safe"
     return f"€{remaining_amount:,} to go"
+
+
+def _render_envelope_page(
+    request: Request,
+    user: User,
+    creation_form: EnvelopeCreationForm | None = None,
+    status_code: int = status.HTTP_200_OK,
+) -> Response:
+    envelope_items = []
+    for envelope in Envelope.for_user(user.id):
+        progress_percentage = _calculate_progress_percentage(envelope)
+        envelope_items.append(
+            EnvelopePageItem(
+                envelope=envelope,
+                progress_percentage=progress_percentage,
+                filled_segments=progress_percentage // 10,
+                status_message=_envelope_status(envelope, progress_percentage),
+            )
+        )
+    return templates.TemplateResponse(
+        request,
+        "envelope/index.html",
+        {
+            "user": user,
+            "envelope_items": envelope_items,
+            "creation_form": creation_form,
+        },
+        status_code=status_code,
+    )
 
 
 @router.post(
@@ -113,21 +149,64 @@ def view_user_envelopes(request: Request, user_id: int) -> Response:
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    envelope_items = []
-    for envelope in Envelope.for_user(user_id):
-        progress_percentage = _calculate_progress_percentage(envelope)
-        envelope_items.append(
-            EnvelopePageItem(
-                envelope=envelope,
-                progress_percentage=progress_percentage,
-                filled_segments=progress_percentage // 10,
-                status_message=_envelope_status(envelope, progress_percentage),
-            )
+    return _render_envelope_page(request, user)
+
+
+@router.post(
+    "/users/{user_id}/envelopes/create",
+    response_class=HTMLResponse,
+    name="create_envelope_from_page",
+)
+def create_envelope_from_page(
+    request: Request,
+    user_id: int,
+    name: Annotated[str, Form()] = "",
+    target_amount: Annotated[str, Form()] = "",
+) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    normalized_name = name.strip()
+    errors: dict[str, str] = {}
+    if not normalized_name:
+        errors["name"] = "Add a name."
+    elif len(normalized_name) > 255:
+        errors["name"] = "Keep the name under 255 characters."
+
+    parsed_target_amount: int | None = None
+    try:
+        parsed_target_amount = int(target_amount)
+    except ValueError:
+        errors["target_amount"] = "Enter a whole amount."
+    else:
+        if parsed_target_amount <= 0:
+            errors["target_amount"] = "Use an amount above 0."
+
+    if errors:
+        creation_form = EnvelopeCreationForm(
+            name=name,
+            target_amount=target_amount,
+            errors=errors,
         )
-    return templates.TemplateResponse(
-        request,
-        "envelope/index.html",
-        {"user": user, "envelope_items": envelope_items},
+        return _render_envelope_page(
+            request,
+            user,
+            creation_form=creation_form,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
+
+    existing_envelopes = Envelope.for_user(user_id)
+    next_priority = max((envelope.priority for envelope in existing_envelopes), default=0) + 1
+    Envelope.create(
+        user_id=user_id,
+        name=normalized_name,
+        target_amount=parsed_target_amount,
+        priority=next_priority,
+    )
+    return RedirectResponse(
+        request.url_for("view_user_envelopes", user_id=user_id),
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
