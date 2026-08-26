@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}">
-    <script src="{{ url_for('static', path='/envelope.js') }}" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=salary-editor-2">
+    <script src="{{ url_for('static', path='/envelope.js') }}?v=salary-editor-1" defer></script>
   </head>
   <body>
     <main class="page-shell">
@@ -13,7 +13,51 @@
         <p class="eyebrow">Long-term savings</p>
         <div class="identity-row">
           <h1>{{ user.username }}</h1>
-          <p class="salary"><span>salary</span> €{{ "{:,}".format(user.salary) }}</p>
+          <div
+            class="salary-editor"
+            data-salary-editor
+            data-current-salary="{{ user.salary }}"
+          >
+            <span class="salary-label">Salary</span>
+            <button
+              class="salary-display"
+              type="button"
+              aria-label="Edit monthly salary, currently €{{ '{:,}'.format(user.salary) }}"
+              {% if salary_form %}hidden{% endif %}
+            >
+              €{{ "{:,}".format(user.salary) }}
+            </button>
+            <form
+              class="salary-form"
+              action="{{ url_for('edit_salary_from_page', user_id=user.id) }}"
+              method="post"
+              novalidate
+              {% if not salary_form %}hidden{% endif %}
+            >
+              <div class="salary-entry">
+                <span aria-hidden="true">€</span>
+                <input
+                  class="salary-input"
+                  id="monthly-salary"
+                  name="salary"
+                  type="number"
+                  min="1"
+                  step="1"
+                  inputmode="numeric"
+                  value="{{ salary_form.value if salary_form else user.salary }}"
+                  aria-label="Monthly salary"
+                  aria-invalid="{{ 'true' if salary_form else 'false' }}"
+                  {% if salary_form %}aria-describedby="salary-error" autofocus{% endif %}
+                  required
+                >
+                <button class="salary-save" type="submit">Save</button>
+                <button class="salary-cancel" type="button" data-salary-cancel>Cancel</button>
+              </div>
+              {% if salary_form %}
+                <p class="salary-error" id="salary-error">{{ salary_form.error }}</p>
+              {% endif %}
+            </form>
+          </div>
         </div>
       </header>
 
@@ -53,7 +97,7 @@
                     <div class="configuration-field calculated-edit-goal">
                       <span class="field-label">Goal</span>
                       <output>€{{ "{:,}".format(item.target_amount) }}</output>
-                      <p>2 × monthly salary</p>
+                      <p>{{ item.envelope.pillow_index }} × monthly salary</p>
                     </div>
                     {% if edit_form and edit_form.errors.get('target_amount') %}
                       <p class="field-error">{{ edit_form.errors.target_amount }}</p>
@@ -156,7 +200,7 @@
                 <span>/ €{{ "{:,}".format(item.target_amount) }}</span>
               </p>
               {% if item.envelope.is_financial_pillow %}
-                <p class="calculated-goal">2 × monthly salary</p>
+                <p class="calculated-goal">{{ item.envelope.pillow_index }} × monthly salary</p>
               {% endif %}
               <p class="device-status">{{ item.status_message }}</p>
             </div>
@@ -297,7 +341,7 @@
                 {% else %}
                   <output>Salary needed</output>
                 {% endif %}
-                <p>2 × monthly salary</p>
+                <p>{{ financial_pillow_index }} × monthly salary</p>
               </div>
 
               <div class="creation-actions">

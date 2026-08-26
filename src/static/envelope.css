@@ -55,7 +55,9 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .eyebrow,
-.salary span,
+.salary-label,
+.salary-save,
+.salary-cancel,
 .device-heading,
 .device-status,
 .creation-trigger,
@@ -98,17 +100,120 @@ h1 {
   letter-spacing: -0.025em;
 }
 
-.salary {
-  margin: 0;
+.salary-editor {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
   color: var(--primary-text);
-  font-size: 0.78rem;
 }
 
-.salary span {
+.salary-label {
   margin-right: 0.3rem;
   color: var(--secondary-text);
   font-size: 0.58rem;
   text-transform: uppercase;
+}
+
+.salary-display {
+  border: 0;
+  color: var(--primary-text);
+  background: transparent;
+  padding: 0.12rem 0;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.salary-display:hover {
+  text-decoration: underline dotted var(--secondary-text);
+  text-underline-offset: 0.2rem;
+}
+
+.salary-display:focus-visible {
+  border-radius: 0.1rem;
+  outline: 1px solid var(--primary-text);
+  outline-offset: 0.18rem;
+}
+
+.salary-display[hidden],
+.salary-form[hidden] {
+  display: none;
+}
+
+.salary-form {
+  width: auto;
+}
+
+.salary-entry {
+  display: grid;
+  grid-template-columns: auto 4.5rem auto auto;
+  align-items: center;
+  gap: 0.22rem;
+}
+
+.salary-entry > span {
+  color: var(--secondary-text);
+  font-size: 0.72rem;
+}
+
+.salary-input {
+  width: 100%;
+  min-width: 0;
+  height: 1.4rem;
+  border: 1px solid var(--display-border);
+  border-radius: 0.15rem;
+  color: var(--primary-text);
+  background: var(--control-background);
+  padding: 0 0.3rem;
+  font-size: 0.68rem;
+}
+
+.salary-input[aria-invalid="true"] {
+  border-color: var(--primary-text);
+}
+
+.salary-save {
+  height: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.15rem;
+  color: var(--primary-text);
+  background: transparent;
+  padding: 0 0.3rem;
+  cursor: pointer;
+  font-size: 0.5rem;
+  text-transform: uppercase;
+}
+
+.salary-save:hover {
+  background: var(--control-background);
+}
+
+.salary-cancel {
+  height: 1.4rem;
+  border: 0;
+  color: var(--secondary-text);
+  background: transparent;
+  padding: 0 0.12rem;
+  cursor: pointer;
+  font-size: 0.5rem;
+  text-transform: uppercase;
+}
+
+.salary-cancel:hover {
+  color: var(--primary-text);
+}
+
+.salary-input:focus-visible,
+.salary-save:focus-visible,
+.salary-cancel:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: 2px;
+}
+
+.salary-error {
+  margin: 0.2rem 0 0 1rem;
+  color: var(--secondary-text);
+  font-size: 0.52rem;
+  line-height: 1.25;
 }
 
 .envelope-grid {
@@ -823,7 +928,7 @@ h1 {
     display: block;
   }
 
-  .salary {
+  .salary-editor {
     margin-top: 0.35rem;
   }
 

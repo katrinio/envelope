@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -22,3 +22,9 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+
+    def update_salary(self, salary: int) -> Self:
+        if salary <= 0:
+            raise ValueError("Use an amount above 0.")
+        self.salary = salary
+        return self.save()

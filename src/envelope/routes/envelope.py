@@ -5,7 +5,10 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from src.envelope.service import calculate_financial_pillow_target
+from src.envelope.service import (
+    FINANCIAL_PILLOW_SALARY_MULTIPLIER,
+    calculate_financial_pillow_target,
+)
 from src.orm.envelope import Envelope, EnvelopeKind
 from src.orm.user import User
 from src.template import templates
@@ -40,6 +43,17 @@ class EnvelopeConfigurationUpdate(BaseModel):
     target_amount: int | None = None
 
 
+class SalaryUpdate(BaseModel):
+    salary: Annotated[int, Field(gt=0)]
+
+
+class SalaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    salary: int
+
+
 class EnvelopeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,6 +64,7 @@ class EnvelopeResponse(BaseModel):
     target_amount: int
     priority: int
     kind: EnvelopeKind
+    pillow_index: int
 
 
 @dataclass(frozen=True)
@@ -82,6 +97,12 @@ class EnvelopeAmountForm:
     envelope_id: int
     operation: Literal["increment", "decrement"]
     amount: str
+    error: str
+
+
+@dataclass(frozen=True)
+class SalaryForm:
+    value: str
     error: str
 
 
@@ -121,6 +142,7 @@ def _render_envelope_page(
     editing_envelope_id: int | None = None,
     edit_form: EnvelopeEditForm | None = None,
     amount_form: EnvelopeAmountForm | None = None,
+    salary_form: SalaryForm | None = None,
     status_code: int = status.HTTP_200_OK,
 ) -> Response:
     envelopes = Envelope.for_user(user.id)
@@ -147,13 +169,28 @@ def _render_envelope_page(
             "editing_envelope_id": editing_envelope_id,
             "edit_form": edit_form,
             "amount_form": amount_form,
+            "salary_form": salary_form,
             "has_financial_pillow": any(envelope.is_financial_pillow for envelope in envelopes),
             "financial_pillow_target": (
-                calculate_financial_pillow_target(user.salary) if user.salary > 0 else None
+                calculate_financial_pillow_target(
+                    user.salary,
+                    FINANCIAL_PILLOW_SALARY_MULTIPLIER,
+                )
+                if user.salary > 0
+                else None
             ),
+            "financial_pillow_index": FINANCIAL_PILLOW_SALARY_MULTIPLIER,
         },
         status_code=status_code,
     )
+
+
+@router.patch("/users/{user_id}/salary", response_model=SalaryResponse)
+def update_user_salary(user_id: int, payload: SalaryUpdate) -> User:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user.update_salary(payload.salary)
 
 
 @router.post(
@@ -324,6 +361,44 @@ def create_envelope_from_page(
             creation_form=creation_form,
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
+    return RedirectResponse(
+        request.url_for("view_user_envelopes", user_id=user_id),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/users/{user_id}/salary/edit",
+    response_class=HTMLResponse,
+    name="edit_salary_from_page",
+)
+def edit_salary_from_page(
+    request: Request,
+    user_id: int,
+    salary: Annotated[str, Form()] = "",
+) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    error_message: str | None = None
+    try:
+        parsed_salary = int(salary)
+    except ValueError:
+        error_message = "Enter a whole amount."
+    else:
+        if parsed_salary <= 0:
+            error_message = "Use an amount above 0."
+
+    if error_message is not None:
+        return _render_envelope_page(
+            request,
+            user,
+            salary_form=SalaryForm(value=salary, error=error_message),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
+
+    user.update_salary(parsed_salary)
     return RedirectResponse(
         request.url_for("view_user_envelopes", user_id=user_id),
         status_code=status.HTTP_303_SEE_OTHER,

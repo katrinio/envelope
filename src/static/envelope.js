@@ -1,4 +1,38 @@
 const menus = [...document.querySelectorAll(".device-menu")];
+const salaryEditor = document.querySelector("[data-salary-editor]");
+
+if (salaryEditor) {
+  const salaryDisplay = salaryEditor.querySelector(".salary-display");
+  const salaryForm = salaryEditor.querySelector(".salary-form");
+  const salaryInput = salaryEditor.querySelector(".salary-input");
+  const salaryCancel = salaryEditor.querySelector("[data-salary-cancel]");
+
+  function openSalaryEditor() {
+    salaryDisplay.hidden = true;
+    salaryForm.hidden = false;
+    salaryInput.focus();
+    salaryInput.select();
+  }
+
+  function closeSalaryEditor() {
+    salaryInput.value = salaryEditor.dataset.currentSalary;
+    salaryInput.setAttribute("aria-invalid", "false");
+    salaryInput.removeAttribute("aria-describedby");
+    salaryEditor.querySelector(".salary-error")?.remove();
+    salaryForm.hidden = true;
+    salaryDisplay.hidden = false;
+    salaryDisplay.focus();
+  }
+
+  salaryDisplay.addEventListener("click", openSalaryEditor);
+  salaryCancel.addEventListener("click", closeSalaryEditor);
+  salaryForm.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSalaryEditor();
+    }
+  });
+}
 
 function closeMenu(menu, restoreFocus = false) {
   const trigger = menu.querySelector(".device-menu-trigger");

@@ -29,6 +29,7 @@ class Envelope(Base):
             name="ck_envelopes_target_amount_by_kind",
         ),
         CheckConstraint("priority > 0", name="ck_envelopes_priority_positive"),
+        CheckConstraint("pillow_index > 0", name="ck_envelopes_pillow_index_positive"),
         CheckConstraint(
             "kind IN ('regular', 'financial_pillow')",
             name="ck_envelopes_kind_valid",
@@ -49,6 +50,7 @@ class Envelope(Base):
     _target_amount: Mapped[int | None] = mapped_column("target_amount", Integer, nullable=True)
     priority: Mapped[int] = mapped_column(Integer)
     kind: Mapped[str] = mapped_column(String(32), default=EnvelopeKind.REGULAR, server_default="regular")
+    pillow_index: Mapped[int] = mapped_column(Integer, default=2, server_default="2")
 
     user: Mapped[User] = relationship(back_populates="envelopes")
 
@@ -66,7 +68,7 @@ class Envelope(Base):
             user = User.get(self.user_id)
             if user is None:
                 raise ValueError("A user is required for a financial pillow.")
-            return calculate_financial_pillow_target(user.salary)
+            return calculate_financial_pillow_target(user.salary, self.pillow_index)
         if self._target_amount is None:
             raise ValueError("target_amount must be greater than 0")
         return self._target_amount
@@ -96,6 +98,12 @@ class Envelope(Base):
     def validate_priority(self, _key: str, value: int) -> int:
         if value <= 0:
             raise ValueError("priority must be positive")
+        return value
+
+    @validates("pillow_index")
+    def validate_pillow_index(self, _key: str, value: int) -> int:
+        if value <= 0:
+            raise ValueError("pillow_index must be positive")
         return value
 
     def update_configuration(self, name: str, target_amount: int | None = None) -> Self:
@@ -131,8 +139,9 @@ class Envelope(Base):
                 raise ValueError("A user is required for an envelope.")
 
             target_amount = values.pop("target_amount", None)
+            pillow_index = values.get("pillow_index", 2)
             if kind == EnvelopeKind.FINANCIAL_PILLOW:
-                calculate_financial_pillow_target(user.salary)
+                calculate_financial_pillow_target(user.salary, pillow_index)
                 existing_pillow = session.scalar(
                     select(cls.id).where(
                         cls.user_id == user_id,

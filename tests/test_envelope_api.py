@@ -780,3 +780,131 @@ def test_regular_envelope_edit_keeps_savings_above_new_goal(client: TestClient) 
     assert "100%" in page_response.text
     assert "goal reached ✓" in page_response.text
     assert "€1,200" in page_response.text
+
+
+def test_salary_is_rendered_as_inline_editor_in_header(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert "€100,000" in response.text
+    assert 'class="salary-display"' in response.text
+    assert 'aria-label="Edit monthly salary, currently €100,000"' in response.text
+    assert 'class="salary-form"' in response.text
+    assert 'value="100000"' in response.text
+    assert "hidden" in response.text
+    assert "/static/envelope.js?v=salary-editor-1" in response.text
+
+
+def test_salary_can_be_updated(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+
+    response = client.patch(
+        f"/users/{user.id}/salary",
+        json={"salary": 1_700},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"id": user.id, "salary": 1_700}
+    stored_user = User.get(user.id)
+    assert stored_user is not None
+    assert stored_user.salary == 1_700
+
+
+@pytest.mark.parametrize("salary", [0, -1])
+def test_salary_backend_rejects_non_positive_value(
+    client: TestClient,
+    salary: int,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+
+    response = client.patch(
+        f"/users/{user.id}/salary",
+        json={"salary": salary},
+    )
+
+    assert response.status_code == 422
+    assert User.get(user.id).salary == 1_500  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize(
+    ("salary", "message"),
+    [("", "Enter a whole amount."), ("abc", "Enter a whole amount."), ("0", "Use an amount above 0.")],
+)
+def test_invalid_salary_renders_local_error(
+    client: TestClient,
+    salary: str,
+    message: str,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+
+    response = client.post(
+        f"/users/{user.id}/salary/edit",
+        data={"salary": salary},
+    )
+
+    assert response.status_code == 422
+    assert response.headers["content-type"].startswith("text/html")
+    assert message in response.text
+    assert 'class="salary-error"' in response.text
+    assert 'aria-invalid="true"' in response.text
+    assert User.get(user.id).salary == 1_500  # type: ignore[union-attr]
+
+
+def test_salary_edit_cancel_does_not_persist(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+
+    page_response = client.get(f"/users/{user.id}/envelopes/page")
+    script_response = client.get("/static/envelope.js")
+
+    assert page_response.status_code == 200
+    assert 'data-current-salary="1500"' in page_response.text
+    assert "data-salary-cancel" in page_response.text
+    assert "salaryInput.value = salaryEditor.dataset.currentSalary" in script_response.text
+    stored_user = User.get(user.id)
+    assert stored_user is not None
+    assert stored_user.salary == 1_500
+
+
+def test_salary_change_preserves_regular_goal_and_recalculates_pillow(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_000)
+    regular = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=250,
+        target_amount=2_500,
+        priority=1,
+    )
+    pillow = Envelope.create(
+        user_id=user.id,
+        name="Reserve",
+        current_amount=3_000,
+        priority=2,
+        kind="financial_pillow",
+        pillow_index=3,
+    )
+
+    response = client.post(
+        f"/users/{user.id}/salary/edit",
+        data={"salary": "2000"},
+    )
+
+    assert response.status_code == 200
+    assert "€2,000" in response.text
+    assert "€6,000" in response.text
+    assert f"3 {chr(215)} monthly salary" in response.text
+    assert "50%" in response.text
+    assert 'aria-valuenow="50"' in response.text
+    assert response.text.count('class="progress-segment is-filled"') == 6
+    assert "€3,000 to go" in response.text
+    stored_regular = Envelope.get(regular.id)
+    stored_pillow = Envelope.get(pillow.id)
+    assert stored_regular is not None
+    assert stored_pillow is not None
+    assert stored_regular.target_amount == 2_500
+    assert stored_pillow.target_amount == 6_000
+    assert stored_pillow.pillow_index == 3
+    assert stored_pillow.current_amount == 3_000
