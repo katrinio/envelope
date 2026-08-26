@@ -98,6 +98,24 @@ class Envelope(Base):
             raise ValueError("priority must be positive")
         return value
 
+    def update_configuration(self, name: str, target_amount: int | None = None) -> Self:
+        normalized_name = name.strip()
+        if not normalized_name:
+            raise ValueError("Add a name.")
+        if len(normalized_name) > 255:
+            raise ValueError("Keep the name under 255 characters.")
+
+        if self.is_financial_pillow:
+            if target_amount is not None:
+                raise ValueError("The financial pillow goal is calculated automatically.")
+        elif target_amount is None or target_amount <= 0:
+            raise ValueError("Use an amount above 0.")
+        else:
+            self._target_amount = target_amount
+
+        self.name = normalized_name
+        return self.save()
+
     @classmethod
     def create(cls, **values: Any) -> Self:
         kind = EnvelopeKind(values.pop("kind", EnvelopeKind.REGULAR))

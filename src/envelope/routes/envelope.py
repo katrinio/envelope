@@ -33,6 +33,13 @@ class EnvelopeCurrentAmountUpdate(BaseModel):
     current_amount: Annotated[int, Field(ge=0)]
 
 
+class EnvelopeConfigurationUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Annotated[str, Field(max_length=255)]
+    target_amount: int | None = None
+
+
 class EnvelopeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -59,6 +66,14 @@ class EnvelopeCreationForm:
     name: str
     target_amount: str
     is_financial_pillow: bool
+    errors: dict[str, str]
+
+
+@dataclass(frozen=True)
+class EnvelopeEditForm:
+    envelope_id: int
+    name: str
+    target_amount: str
     errors: dict[str, str]
 
 
@@ -95,6 +110,8 @@ def _render_envelope_page(
     request: Request,
     user: User,
     creation_form: EnvelopeCreationForm | None = None,
+    editing_envelope_id: int | None = None,
+    edit_form: EnvelopeEditForm | None = None,
     status_code: int = status.HTTP_200_OK,
 ) -> Response:
     envelopes = Envelope.for_user(user.id)
@@ -118,6 +135,8 @@ def _render_envelope_page(
             "user": user,
             "envelope_items": envelope_items,
             "creation_form": creation_form,
+            "editing_envelope_id": editing_envelope_id,
+            "edit_form": edit_form,
             "has_financial_pillow": any(envelope.is_financial_pillow for envelope in envelopes),
             "financial_pillow_target": (
                 calculate_financial_pillow_target(user.salary) if user.salary > 0 else None
@@ -163,6 +182,24 @@ def update_current_amount(envelope_id: int, payload: EnvelopeCurrentAmountUpdate
     return _set_current_amount(envelope, payload.current_amount)
 
 
+@router.patch("/envelopes/{envelope_id}", response_model=EnvelopeResponse)
+def update_envelope_configuration(
+    envelope_id: int,
+    payload: EnvelopeConfigurationUpdate,
+) -> Envelope:
+    envelope = _get_envelope_or_404(envelope_id)
+    try:
+        return envelope.update_configuration(
+            name=payload.name,
+            target_amount=payload.target_amount,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+
 @router.delete("/envelopes/{envelope_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_envelope(envelope_id: int) -> None:
     envelope = _get_envelope_or_404(envelope_id)
@@ -174,12 +211,25 @@ def delete_envelope(envelope_id: int) -> None:
     response_class=HTMLResponse,
     name="view_user_envelopes",
 )
-def view_user_envelopes(request: Request, user_id: int) -> Response:
+def view_user_envelopes(
+    request: Request,
+    user_id: int,
+    edit_envelope_id: int | None = None,
+) -> Response:
     user = User.get(user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return _render_envelope_page(request, user)
+    if edit_envelope_id is not None:
+        envelope = _get_envelope_or_404(edit_envelope_id)
+        if envelope.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Envelope not found")
+
+    return _render_envelope_page(
+        request,
+        user,
+        editing_envelope_id=edit_envelope_id,
+    )
 
 
 @router.post(
@@ -264,6 +314,75 @@ def create_envelope_from_page(
             creation_form=creation_form,
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
+    return RedirectResponse(
+        request.url_for("view_user_envelopes", user_id=user_id),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/users/{user_id}/envelopes/{envelope_id}/edit",
+    response_class=HTMLResponse,
+    name="edit_envelope_from_page",
+)
+def edit_envelope_from_page(
+    request: Request,
+    user_id: int,
+    envelope_id: int,
+    name: Annotated[str, Form()] = "",
+    target_amount: Annotated[str | None, Form()] = None,
+) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    envelope = _get_envelope_or_404(envelope_id)
+    if envelope.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Envelope not found")
+
+    normalized_name = name.strip()
+    errors: dict[str, str] = {}
+    if not normalized_name:
+        errors["name"] = "Add a name."
+    elif len(normalized_name) > 255:
+        errors["name"] = "Keep the name under 255 characters."
+
+    parsed_target_amount: int | None = None
+    if envelope.is_financial_pillow:
+        if target_amount is not None:
+            errors["target_amount"] = "The calculated goal cannot be changed."
+    else:
+        try:
+            parsed_target_amount = int(target_amount or "")
+        except ValueError:
+            errors["target_amount"] = "Enter a whole amount."
+        else:
+            if parsed_target_amount <= 0:
+                errors["target_amount"] = "Use an amount above 0."
+
+    if not errors:
+        try:
+            envelope.update_configuration(
+                name=normalized_name,
+                target_amount=parsed_target_amount,
+            )
+        except ValueError as error:
+            errors["target_amount"] = str(error)
+
+    if errors:
+        edit_form = EnvelopeEditForm(
+            envelope_id=envelope_id,
+            name=name,
+            target_amount=target_amount or "",
+            errors=errors,
+        )
+        return _render_envelope_page(
+            request,
+            user,
+            editing_envelope_id=envelope_id,
+            edit_form=edit_form,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
+
     return RedirectResponse(
         request.url_for("view_user_envelopes", user_id=user_id),
         status_code=status.HTTP_303_SEE_OTHER,

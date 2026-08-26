@@ -108,12 +108,78 @@ h1 {
 }
 
 .envelope-device {
+  position: relative;
   width: 15.5rem;
   min-height: 13.25rem;
   border: 1px solid var(--border);
   border-radius: 0.45rem;
   background: var(--device-background);
   padding: 0.6rem 0.6rem 0.7rem;
+}
+
+.device-menu {
+  position: absolute;
+  z-index: 2;
+  top: 0.76rem;
+  right: 0.78rem;
+}
+
+.device-menu summary {
+  color: var(--secondary-text);
+  cursor: pointer;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  list-style: none;
+}
+
+.device-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.device-menu summary:hover,
+.device-menu[open] summary {
+  color: var(--primary-text);
+}
+
+.device-menu-items {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  min-width: 4.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.15rem;
+  background: var(--page-background);
+  padding: 0.25rem;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.device-menu-items a,
+.device-menu-items span {
+  display: block;
+  color: var(--primary-text);
+  padding: 0.35rem 0.4rem;
+  text-decoration: none;
+}
+
+.device-menu-items a:hover {
+  background: var(--device-background);
+}
+
+.device-menu-items span[aria-disabled="true"] {
+  color: var(--secondary-text);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.device-menu summary:focus-visible,
+.device-menu-items a:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: 2px;
 }
 
 .creation-device {
@@ -176,6 +242,111 @@ h1 {
   border-radius: 0.16rem;
   background: var(--display-background);
   padding: 0.75rem;
+}
+
+.configuration-panel {
+  min-height: 11.9rem;
+  border: 1px solid var(--display-border);
+  border-radius: 0.16rem;
+  background: var(--display-background);
+  padding: 0.75rem;
+}
+
+.configuration-title,
+.configuration-field label,
+.configuration-field .field-label,
+.calculated-edit-goal p,
+.configuration-actions {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.06em;
+}
+
+.configuration-title {
+  margin-bottom: 0.8rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.configuration-field {
+  margin-bottom: 0.7rem;
+}
+
+.configuration-field label,
+.configuration-field .field-label {
+  display: block;
+  margin-bottom: 0.28rem;
+  color: var(--secondary-text);
+  font-size: 0.57rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.configuration-field input {
+  width: 100%;
+  height: 1.8rem;
+  border: 1px solid var(--display-border);
+  border-radius: 0.15rem;
+  color: var(--primary-text);
+  background: var(--control-background);
+  padding: 0 0.4rem;
+  font-size: 0.72rem;
+}
+
+.configuration-field input[aria-invalid="true"] {
+  border-color: var(--primary-text);
+}
+
+.calculated-edit-goal output {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.calculated-edit-goal p {
+  margin: 0.18rem 0 0;
+  color: var(--secondary-text);
+  font-size: 0.55rem;
+}
+
+.configuration-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+  font-size: 0.57rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.configuration-actions a,
+.configuration-actions button {
+  display: grid;
+  height: 1.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.15rem;
+  padding: 0 0.5rem;
+  cursor: pointer;
+  text-decoration: none;
+  place-items: center;
+}
+
+.configuration-actions a {
+  color: var(--primary-text);
+  background: transparent;
+}
+
+.configuration-actions button {
+  color: var(--control-background);
+  background: var(--segment-fill);
+}
+
+.configuration-field input:focus-visible,
+.configuration-actions a:focus-visible,
+.configuration-actions button:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: 2px;
 }
 
 .creation-title {
@@ -389,6 +560,7 @@ h1 {
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
+  padding-right: 1.1rem;
 }
 
 .device-heading h2 {

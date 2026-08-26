@@ -19,6 +19,88 @@
       <section class="envelope-grid" aria-label="Savings envelopes">
         {% for item in envelope_items %}
           <article class="envelope-device">
+            {% if editing_envelope_id == item.envelope.id %}
+              <div class="configuration-panel">
+                <p class="configuration-title">Edit envelope</p>
+                <form
+                  class="configuration-form"
+                  action="{{ url_for('edit_envelope_from_page', user_id=user.id, envelope_id=item.envelope.id) }}"
+                  method="post"
+                  novalidate
+                >
+                  <div class="configuration-field">
+                    <label for="edit-envelope-name-{{ item.envelope.id }}">Name</label>
+                    <input
+                      id="edit-envelope-name-{{ item.envelope.id }}"
+                      name="name"
+                      type="text"
+                      maxlength="255"
+                      value="{{ edit_form.name if edit_form else item.envelope.name }}"
+                      aria-invalid="{{ 'true' if edit_form and edit_form.errors.get('name') else 'false' }}"
+                      {% if edit_form and edit_form.errors.get('name') %}
+                        aria-describedby="edit-envelope-name-error-{{ item.envelope.id }}"
+                      {% endif %}
+                    >
+                    {% if edit_form and edit_form.errors.get('name') %}
+                      <p class="field-error" id="edit-envelope-name-error-{{ item.envelope.id }}">
+                        {{ edit_form.errors.name }}
+                      </p>
+                    {% endif %}
+                  </div>
+
+                  {% if item.envelope.is_financial_pillow %}
+                    <div class="configuration-field calculated-edit-goal">
+                      <span class="field-label">Goal</span>
+                      <output>€{{ "{:,}".format(item.target_amount) }}</output>
+                      <p>2 × monthly salary</p>
+                    </div>
+                    {% if edit_form and edit_form.errors.get('target_amount') %}
+                      <p class="field-error">{{ edit_form.errors.target_amount }}</p>
+                    {% endif %}
+                  {% else %}
+                    <div class="configuration-field">
+                      <label for="edit-envelope-target-{{ item.envelope.id }}">Goal</label>
+                      <div class="goal-entry">
+                        <span aria-hidden="true">€</span>
+                        <input
+                          id="edit-envelope-target-{{ item.envelope.id }}"
+                          name="target_amount"
+                          type="number"
+                          min="1"
+                          step="1"
+                          inputmode="numeric"
+                          value="{{ edit_form.target_amount if edit_form else item.target_amount }}"
+                          aria-invalid="{{ 'true' if edit_form and edit_form.errors.get('target_amount') else 'false' }}"
+                          {% if edit_form and edit_form.errors.get('target_amount') %}
+                            aria-describedby="edit-envelope-target-error-{{ item.envelope.id }}"
+                          {% endif %}
+                        >
+                      </div>
+                      {% if edit_form and edit_form.errors.get('target_amount') %}
+                        <p class="field-error" id="edit-envelope-target-error-{{ item.envelope.id }}">
+                          {{ edit_form.errors.target_amount }}
+                        </p>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+
+                  <div class="configuration-actions">
+                    <a href="{{ url_for('view_user_envelopes', user_id=user.id) }}">Cancel</a>
+                    <button type="submit">Save</button>
+                  </div>
+                </form>
+              </div>
+            {% else %}
+            <details class="device-menu">
+              <summary aria-label="Envelope menu">•••</summary>
+              <div class="device-menu-items">
+                <a href="{{ url_for('view_user_envelopes', user_id=user.id) }}?edit_envelope_id={{ item.envelope.id }}">
+                  Edit
+                </a>
+                <span aria-disabled="true">Delete</span>
+              </div>
+            </details>
+
             <div class="device-screen">
               <header class="device-heading">
                 <h2>{{ item.envelope.name }}</h2>
@@ -83,6 +165,7 @@
                 </details>
               {% endfor %}
             </div>
+            {% endif %}
           </article>
         {% endfor %}
 
