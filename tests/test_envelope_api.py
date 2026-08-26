@@ -257,6 +257,62 @@ def test_envelope_page_changes_current_amount(client: TestClient) -> None:
     assert client.get(f"/envelopes/{envelope['id']}").json()["current_amount"] == 125
 
 
+def test_decrement_below_zero_renders_local_amount_error(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Emergency fund",
+        current_amount=10,
+        target_amount=1_000,
+        priority=1,
+    )
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/{envelope.id}/amount",
+        data={"amount": "20", "operation": "decrement"},
+    )
+
+    assert response.status_code == 422
+    assert response.headers["content-type"].startswith("text/html")
+    assert "Saved amount cannot go below €0." in response.text
+    assert '<details class="adjustment-control" open>' in response.text
+    assert 'value="20"' in response.text
+    assert 'aria-invalid="true"' in response.text
+    stored_envelope = Envelope.get(envelope.id)
+    assert stored_envelope is not None
+    assert stored_envelope.current_amount == 10
+
+
+@pytest.mark.parametrize(
+    ("amount", "message"),
+    [("0", "Use an amount above 0."), ("abc", "Enter a whole amount.")],
+)
+def test_invalid_amount_renders_local_error(
+    client: TestClient,
+    amount: str,
+    message: str,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Emergency fund",
+        current_amount=10,
+        target_amount=1_000,
+        priority=1,
+    )
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/{envelope.id}/amount",
+        data={"amount": amount, "operation": "decrement"},
+    )
+
+    assert response.status_code == 422
+    assert response.headers["content-type"].startswith("text/html")
+    assert message in response.text
+    assert f'value="{amount}"' in response.text
+    assert Envelope.get(envelope.id).current_amount == 10  # type: ignore[union-attr]
+
+
 def test_financial_pillow_uses_current_salary_and_ignores_supplied_target(
     client: TestClient,
 ) -> None:

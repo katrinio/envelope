@@ -77,6 +77,14 @@ class EnvelopeEditForm:
     errors: dict[str, str]
 
 
+@dataclass(frozen=True)
+class EnvelopeAmountForm:
+    envelope_id: int
+    operation: Literal["increment", "decrement"]
+    amount: str
+    error: str
+
+
 def _get_envelope_or_404(envelope_id: int) -> Envelope:
     envelope = Envelope.get(envelope_id)
     if envelope is None:
@@ -112,6 +120,7 @@ def _render_envelope_page(
     creation_form: EnvelopeCreationForm | None = None,
     editing_envelope_id: int | None = None,
     edit_form: EnvelopeEditForm | None = None,
+    amount_form: EnvelopeAmountForm | None = None,
     status_code: int = status.HTTP_200_OK,
 ) -> Response:
     envelopes = Envelope.for_user(user.id)
@@ -137,6 +146,7 @@ def _render_envelope_page(
             "creation_form": creation_form,
             "editing_envelope_id": editing_envelope_id,
             "edit_form": edit_form,
+            "amount_form": amount_form,
             "has_financial_pillow": any(envelope.is_financial_pillow for envelope in envelopes),
             "financial_pillow_target": (
                 calculate_financial_pillow_target(user.salary) if user.salary > 0 else None
@@ -391,25 +401,50 @@ def edit_envelope_from_page(
 
 @router.post(
     "/users/{user_id}/envelopes/{envelope_id}/amount",
-    response_class=RedirectResponse,
+    response_class=HTMLResponse,
     name="change_envelope_amount",
 )
 def change_envelope_amount(
     request: Request,
     user_id: int,
     envelope_id: int,
-    amount: Annotated[int, Form(gt=0)],
     operation: Annotated[Literal["increment", "decrement"], Form()],
-) -> RedirectResponse:
+    amount: Annotated[str, Form()] = "",
+) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     envelope = _get_envelope_or_404(envelope_id)
     if envelope.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Envelope not found")
 
-    delta = amount if operation == "increment" else -amount
+    error_message: str | None = None
     try:
-        _set_current_amount(envelope, envelope.current_amount + delta)
-    except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error))
+        parsed_amount = int(amount)
+    except ValueError:
+        error_message = "Enter a whole amount."
+    else:
+        if parsed_amount <= 0:
+            error_message = "Use an amount above 0."
+        else:
+            delta = parsed_amount if operation == "increment" else -parsed_amount
+            try:
+                _set_current_amount(envelope, envelope.current_amount + delta)
+            except ValueError:
+                error_message = "Saved amount cannot go below €0."
+
+    if error_message is not None:
+        return _render_envelope_page(
+            request,
+            user,
+            amount_form=EnvelopeAmountForm(
+                envelope_id=envelope_id,
+                operation=operation,
+                amount=amount,
+                error=error_message,
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
 
     return RedirectResponse(
         request.url_for("view_user_envelopes", user_id=user_id),

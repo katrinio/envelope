@@ -166,7 +166,10 @@
                 ('decrement', '−', 'Decrease amount'),
                 ('increment', '+', 'Increase amount')
               ] %}
-                <details class="adjustment-control">
+                {% set has_amount_error = amount_form
+                  and amount_form.envelope_id == item.envelope.id
+                  and amount_form.operation == operation %}
+                <details class="adjustment-control"{% if has_amount_error %} open{% endif %}>
                   <summary aria-label="{{ label }}">{{ symbol }}</summary>
                   <form
                     class="amount-form"
@@ -184,10 +187,20 @@
                         step="1"
                         inputmode="numeric"
                         placeholder="0"
+                        value="{{ amount_form.amount if has_amount_error else '' }}"
+                        aria-invalid="{{ 'true' if has_amount_error else 'false' }}"
+                        {% if has_amount_error %}
+                          aria-describedby="amount-error-{{ operation }}-{{ item.envelope.id }}"
+                        {% endif %}
                         required
                       >
                       <button name="operation" value="{{ operation }}" type="submit">OK</button>
                     </div>
+                    {% if has_amount_error %}
+                      <p class="amount-error" id="amount-error-{{ operation }}-{{ item.envelope.id }}">
+                        {{ amount_form.error }}
+                      </p>
+                    {% endif %}
                   </form>
                 </details>
               {% endfor %}
