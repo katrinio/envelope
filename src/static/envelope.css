@@ -1,0 +1,343 @@
+:root {
+  --page-background: #f1eee4;
+  --device-background: #e7e2d7;
+  --display-background: #f7f3e9;
+  --control-background: #fbf8f1;
+  --primary-text: #272725;
+  --secondary-text: #706c64;
+  --border: #5c5953;
+  --display-border: #8a857c;
+  --segment-fill: #383835;
+
+  color: var(--primary-text);
+  background: var(--page-background);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--page-background);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.page-shell {
+  width: min(54rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2.75rem 0 4rem;
+}
+
+.page-header {
+  max-width: 34rem;
+  margin-bottom: 2rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.eyebrow,
+.salary span,
+.device-heading,
+.device-status,
+.empty-symbol {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.06em;
+}
+
+.eyebrow {
+  margin: 0 0 0.55rem;
+  color: var(--secondary-text);
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.identity-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: 1.45rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.salary {
+  margin: 0;
+  color: var(--primary-text);
+  font-size: 0.78rem;
+}
+
+.salary span {
+  margin-right: 0.3rem;
+  color: var(--secondary-text);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+}
+
+.envelope-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 15.5rem);
+  justify-content: start;
+  gap: 1.25rem;
+}
+
+.envelope-device {
+  width: 15.5rem;
+  min-height: 13.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--device-background);
+  padding: 0.6rem 0.6rem 0.7rem;
+}
+
+.device-screen {
+  border: 1px solid var(--display-border);
+  border-radius: 0.16rem;
+  background: var(--display-background);
+  padding: 0.8rem 0.75rem 0.75rem;
+}
+
+.device-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.device-heading h2 {
+  overflow: hidden;
+  margin-bottom: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.percentage {
+  flex: none;
+  color: var(--primary-text);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.progress-segments {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 0.28rem;
+  margin: 1.15rem 0 0.8rem;
+}
+
+.progress-segment {
+  height: 0.74rem;
+  border: 1px solid var(--border);
+  background: transparent;
+}
+
+.progress-segment.is-filled {
+  border-color: var(--segment-fill);
+  background: var(--segment-fill);
+}
+
+.amounts {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin-bottom: 0.55rem;
+  white-space: nowrap;
+}
+
+.amounts strong {
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.amounts span {
+  color: var(--secondary-text);
+  font-size: 0.72rem;
+}
+
+.device-status {
+  min-height: 0.8rem;
+  margin-bottom: 0;
+  color: var(--secondary-text);
+  font-size: 0.61rem;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.device-controls {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 0.85rem;
+  padding-top: 0.7rem;
+}
+
+.adjustment-control {
+  position: relative;
+}
+
+.adjustment-control summary {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  color: var(--primary-text);
+  background: var(--control-background);
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1;
+  list-style: none;
+  place-items: center;
+  user-select: none;
+}
+
+.adjustment-control summary::-webkit-details-marker {
+  display: none;
+}
+
+.adjustment-control[open] summary {
+  color: var(--control-background);
+  background: var(--segment-fill);
+}
+
+.amount-form {
+  position: absolute;
+  z-index: 1;
+  bottom: calc(100% + 0.5rem);
+  left: 50%;
+  width: 8.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  background: var(--page-background);
+  padding: 0.5rem;
+  transform: translateX(-50%);
+}
+
+.amount-form label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--secondary-text);
+  font-size: 0.58rem;
+}
+
+.amount-entry {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.amount-entry span {
+  color: var(--secondary-text);
+  font-size: 0.75rem;
+}
+
+.amount-entry input {
+  width: 100%;
+  min-width: 0;
+  height: 1.65rem;
+  border: 1px solid var(--display-border);
+  border-radius: 0.15rem;
+  color: var(--primary-text);
+  background: var(--control-background);
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
+}
+
+.amount-entry input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.amount-entry input[type="number"]::-webkit-inner-spin-button,
+.amount-entry input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.amount-entry button {
+  height: 1.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.15rem;
+  color: var(--control-background);
+  background: var(--segment-fill);
+  padding: 0 0.35rem;
+  cursor: pointer;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.58rem;
+}
+
+.adjustment-control summary:focus-visible,
+.amount-entry input:focus-visible,
+.amount-entry button:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: 2px;
+}
+
+.empty-state {
+  width: min(100%, 20rem);
+  border: 1px solid var(--display-border);
+  border-radius: 0.35rem;
+  padding: 2rem 1.25rem;
+  text-align: center;
+}
+
+.empty-symbol {
+  margin-bottom: 0.75rem;
+  color: var(--secondary-text);
+  font-size: 0.7rem;
+}
+
+.empty-state h2 {
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.empty-state p:last-child {
+  margin-bottom: 0;
+  color: var(--secondary-text);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 36rem) {
+  .page-shell {
+    padding-top: 1.75rem;
+  }
+
+  .identity-row {
+    display: block;
+  }
+
+  .salary {
+    margin-top: 0.35rem;
+  }
+
+  .envelope-grid {
+    grid-template-columns: minmax(0, 15.5rem);
+  }
+}
