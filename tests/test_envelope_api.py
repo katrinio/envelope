@@ -102,6 +102,26 @@ def test_envelope_page_renders(client: TestClient) -> None:
     assert "100,000" in response.text
 
 
+def test_insights_section_is_collapsed_and_contains_three_cards(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+    stylesheet = Path("src/static/envelope.css").read_text()
+
+    assert response.status_code == 200
+    details_tag = response.text.split('<details class="insights-section"', maxsplit=1)[1].split(
+        ">", maxsplit=1
+    )[0]
+    assert "open" not in details_tag
+    assert "Insights" in response.text
+    assert response.text.count('class="insight-card"') == 3
+    assert "Where should I save next?" in response.text
+    assert "How close are my goals?" in response.text
+    assert "What needs attention?" in response.text
+    assert ".insights-list" in stylesheet
+    assert "width: 100%;" in stylesheet
+
+
 def test_envelope_page_shows_envelope_data(client: TestClient) -> None:
     user = User.create(userId=1, username="alice", salary=100_000)
     envelope = client.post(

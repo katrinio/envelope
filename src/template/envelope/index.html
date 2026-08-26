@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=envelope-delete-dialog-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=insights-section-1">
     <script src="{{ url_for('static', path='/envelope.js') }}?v=envelope-delete-dialog-1" defer></script>
   </head>
   <body>
@@ -351,6 +351,27 @@
           </div>
         </details>
       </section>
+
+      <details class="insights-section">
+        <summary class="insights-summary">
+          <h2>Insights</h2>
+          <span class="insights-toggle" aria-hidden="true"></span>
+        </summary>
+        <div class="insights-list">
+          <article class="insight-card">
+            <p class="insight-question">Where should I save next?</p>
+            <p class="insight-placeholder">Insight will appear here.</p>
+          </article>
+          <article class="insight-card">
+            <p class="insight-question">How close are my goals?</p>
+            <p class="insight-placeholder">Insight will appear here.</p>
+          </article>
+          <article class="insight-card">
+            <p class="insight-question">What needs attention?</p>
+            <p class="insight-placeholder">Insight will appear here.</p>
+          </article>
+        </div>
+      </details>
     </main>
 
     <dialog

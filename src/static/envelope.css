@@ -825,6 +825,85 @@ h1 {
   opacity: 0.55;
 }
 
+.insights-section {
+  margin-top: 3rem;
+}
+
+.insights-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.8rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.insights-summary::-webkit-details-marker {
+  display: none;
+}
+
+.insights-summary h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.insights-toggle {
+  color: var(--secondary-text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.75rem;
+}
+
+.insights-toggle::before {
+  content: "+";
+}
+
+.insights-section[open] .insights-toggle::before {
+  content: "−";
+}
+
+.insights-summary:hover .insights-toggle,
+.insights-summary:focus-visible .insights-toggle {
+  color: var(--primary-text);
+}
+
+.insights-summary:focus-visible {
+  outline: 1px solid var(--primary-text);
+  outline-offset: 0.2rem;
+}
+
+.insights-list {
+  display: grid;
+  gap: 0.7rem;
+  padding-top: 1rem;
+}
+
+.insight-card {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  background: var(--device-background);
+  padding: 0.9rem 1rem;
+}
+
+.insight-question {
+  margin-bottom: 0.35rem;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.insight-placeholder {
+  margin-bottom: 0;
+  color: var(--secondary-text);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
 .progress-segments {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
