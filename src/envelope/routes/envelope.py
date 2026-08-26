@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from src.envelope.service import (
     FINANCIAL_PILLOW_SALARY_MULTIPLIER,
     calculate_financial_pillow_target,
+    calculate_saving_insight,
 )
 from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope, EnvelopeKind
@@ -148,6 +149,14 @@ def _render_envelope_page(
     status_code: int = status.HTTP_200_OK,
 ) -> Response:
     envelopes = Envelope.for_user(user.id)
+    regular_contributions = Contribution.regular_for_user(user.id)
+    saving_insight = calculate_saving_insight(
+        user.salary,
+        (
+            (contribution.amount, contribution.contributed_at)
+            for contribution in regular_contributions
+        ),
+    )
     envelope_items = []
     for envelope in envelopes:
         target_amount = envelope.target_amount
@@ -172,6 +181,7 @@ def _render_envelope_page(
             "edit_form": edit_form,
             "amount_form": amount_form,
             "salary_form": salary_form,
+            "saving_insight": saving_insight,
             "has_financial_pillow": any(envelope.is_financial_pillow for envelope in envelopes),
             "financial_pillow_target": (
                 calculate_financial_pillow_target(

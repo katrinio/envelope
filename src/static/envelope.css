@@ -904,6 +904,42 @@ h1 {
   line-height: 1.4;
 }
 
+.saving-rate {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0.55rem 0 0.35rem;
+}
+
+.saving-rate strong {
+  font-size: 1.7rem;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+
+.saving-rate span,
+.saving-period,
+.saving-trend {
+  color: var(--secondary-text);
+  font-size: 0.64rem;
+}
+
+.saving-average {
+  margin-bottom: 0.16rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.saving-period {
+  margin-bottom: 0;
+}
+
+.saving-trend {
+  margin: 0.55rem 0 0;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.02em;
+}
+
 .progress-segments {
   display: grid;
   grid-template-columns: repeat(10, 1fr);

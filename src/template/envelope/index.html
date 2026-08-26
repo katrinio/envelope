@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=regular-contribution-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=saving-insight-1">
     <script src="{{ url_for('static', path='/envelope.js') }}?v=envelope-delete-dialog-1" defer></script>
   </head>
   <body>
@@ -371,8 +371,25 @@
         </summary>
         <div class="insights-list">
           <article class="insight-card">
-            <p class="insight-question">Where should I save next?</p>
-            <p class="insight-placeholder">Insight will appear here.</p>
+            <p class="insight-question">How am I saving?</p>
+            {% if saving_insight %}
+              <p class="saving-rate">
+                <strong>{{ saving_insight.average_saving_rate }}%</strong>
+                <span>of your salary</span>
+              </p>
+              <p class="saving-average">
+                €{{ "{:,}".format(saving_insight.average_monthly_amount) }}/month on average
+              </p>
+              <p class="saving-period">
+                over the last {{ saving_insight.months_count }} complete
+                {{ "month" if saving_insight.months_count == 1 else "months" }}
+              </p>
+              {% if saving_insight.trend_message %}
+                <p class="saving-trend">{{ saving_insight.trend_message }}</p>
+              {% endif %}
+            {% else %}
+              <p class="insight-placeholder">No regular contribution history yet.</p>
+            {% endif %}
           </article>
           <article class="insight-card">
             <p class="insight-question">How close are my goals?</p>

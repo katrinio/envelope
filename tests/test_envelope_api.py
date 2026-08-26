@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -116,9 +117,10 @@ def test_insights_section_is_collapsed_and_contains_three_cards(client: TestClie
     assert "open" not in details_tag
     assert "Insights" in response.text
     assert response.text.count('class="insight-card"') == 3
-    assert "Where should I save next?" in response.text
+    assert "How am I saving?" in response.text
     assert "How close are my goals?" in response.text
     assert "What needs attention?" in response.text
+    assert "No regular contribution history yet." in response.text
     assert ".insights-list" in stylesheet
     assert "width: 100%;" in stylesheet
 
@@ -340,6 +342,62 @@ def test_non_regular_contribution_is_persisted(client: TestClient) -> None:
     assert contributions[0].amount == 40
     assert contributions[0].is_regular is False
     assert contributions[0].contributed_at is not None
+
+
+def test_saving_insight_combines_regular_contributions_from_all_envelopes(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=1_000)
+    first_envelope = Envelope.create(
+        user_id=user.id,
+        name="Emergency fund",
+        target_amount=10_000,
+        priority=1,
+    )
+    second_envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        target_amount=5_000,
+        priority=2,
+    )
+    current_month = date.today().replace(day=1)
+    current_month_index = current_month.year * 12 + current_month.month - 1
+
+    for offset, envelope_id, amount in [
+        (-3, first_envelope.id, 100),
+        (-2, second_envelope.id, 200),
+        (-1, first_envelope.id, 300),
+    ]:
+        year, zero_based_month = divmod(current_month_index + offset, 12)
+        Contribution.create(
+            envelope_id=envelope_id,
+            amount=amount,
+            is_regular=True,
+            contributed_at=datetime(year, zero_based_month + 1, 10),
+        )
+
+    previous_year, previous_month = divmod(current_month_index - 1, 12)
+    Contribution.create(
+        envelope_id=second_envelope.id,
+        amount=9_000,
+        is_regular=False,
+        contributed_at=datetime(previous_year, previous_month + 1, 12),
+    )
+    Contribution.create(
+        envelope_id=second_envelope.id,
+        amount=8_000,
+        is_regular=True,
+        contributed_at=datetime(current_month.year, current_month.month, 1),
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert '<strong>20%</strong>' in response.text
+    assert "€200/month on average" in response.text
+    assert "over the last 3 complete" in response.text
+    assert "months" in response.text
+    assert "9,000/month" not in response.text
 
 
 def test_decrement_below_zero_renders_local_amount_error(client: TestClient) -> None:

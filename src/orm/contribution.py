@@ -74,3 +74,19 @@ class Contribution(Base):
                 .order_by(cls.contributed_at, cls.id)
             )
             return list(session.scalars(query).all())
+
+    @classmethod
+    def regular_for_user(cls, user_id: int) -> list[Self]:
+        from src.orm.envelope import Envelope
+
+        with database.SessionLocal() as session:
+            query = (
+                select(cls)
+                .join(Envelope, cls.envelope_id == Envelope.id)
+                .where(
+                    Envelope.user_id == user_id,
+                    cls.is_regular.is_(True),
+                )
+                .order_by(cls.contributed_at, cls.id)
+            )
+            return list(session.scalars(query).all())
