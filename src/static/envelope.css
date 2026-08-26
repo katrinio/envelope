@@ -1,6 +1,6 @@
 :root {
-  color: #171717;
-  background: #f4f4f2;
+  color: #1b1c18;
+  background: #ebe7d9;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
 }
@@ -12,7 +12,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f4f4f2;
+  background: #ebe7d9;
 }
 
 button,
@@ -21,22 +21,40 @@ input {
 }
 
 .page-shell {
-  width: min(68rem, calc(100% - 2rem));
+  width: min(54rem, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 4rem 0;
+  padding: 2.75rem 0 4rem;
 }
 
 .page-header {
-  margin-bottom: 2.5rem;
+  max-width: 34rem;
+  margin-bottom: 2rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid #32332d;
+}
+
+.eyebrow,
+.salary span,
+.device-heading,
+.device-status,
+.empty-symbol {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.06em;
 }
 
 .eyebrow {
-  margin: 0 0 0.5rem;
-  color: #666;
-  font-size: 0.75rem;
+  margin: 0 0 0.55rem;
+  color: #65665d;
+  font-size: 0.64rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.identity-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 h1,
@@ -46,144 +64,258 @@ p {
 }
 
 h1 {
-  margin-bottom: 0.4rem;
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  font-weight: 600;
-  letter-spacing: -0.04em;
+  margin-bottom: 0;
+  font-size: 1.45rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
 }
 
 .salary {
-  margin-bottom: 0;
-  color: #666;
+  margin: 0;
+  color: #292a25;
+  font-size: 0.78rem;
 }
 
-.salary strong {
-  color: #171717;
+.salary span {
+  margin-right: 0.3rem;
+  color: #707168;
+  font-size: 0.58rem;
+  text-transform: uppercase;
 }
 
 .envelope-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, 15.5rem);
+  justify-content: start;
+  gap: 1.25rem;
 }
 
-.envelope-card,
-.empty-state {
-  border: 1px solid #242424;
-  border-radius: 0.45rem;
-  background: #fff;
-  padding: 1.5rem;
+.envelope-device {
+  width: 15.5rem;
+  min-height: 13.25rem;
+  border: 1px solid #292a25;
+  border-radius: 0.55rem;
+  background: #dedbcc;
+  padding: 0.65rem;
 }
 
-.card-heading {
+.device-screen {
+  border: 1px solid #55564f;
+  border-radius: 0.2rem;
+  background: #d0d2b9;
+  padding: 0.8rem;
+}
+
+.device-heading {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
-.card-heading h2,
-.empty-state h2 {
+.device-heading h2 {
+  overflow: hidden;
   margin-bottom: 0;
-  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 1.1rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.card-heading span {
-  color: #666;
-  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 0.85rem;
+.percentage {
+  flex: none;
+  color: #34352f;
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 
 .progress-segments {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 0.3rem;
-  margin: 1.5rem 0 0.8rem;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 0.14rem;
+  margin: 1.15rem 0 0.8rem;
 }
 
 .progress-segment {
-  height: 0.65rem;
-  border: 1px solid #777;
-  background: #fff;
+  height: 0.72rem;
+  border: 1px solid #5f6156;
+  background: transparent;
 }
 
 .progress-segment.is-filled {
-  border-color: #222;
-  background: #222;
+  border-color: #20211d;
+  background: #20211d;
 }
 
 .amounts {
   display: flex;
   align-items: baseline;
-  gap: 0.35rem;
-  margin-bottom: 1.5rem;
+  gap: 0.25rem;
+  margin-bottom: 0.55rem;
+  white-space: nowrap;
 }
 
 .amounts strong {
-  font-size: 1.35rem;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
 }
 
-.amounts span,
-.empty-state p {
-  color: #717171;
+.amounts span {
+  color: #5e6056;
+  font-size: 0.72rem;
+}
+
+.device-status {
+  min-height: 0.8rem;
+  margin-bottom: 0;
+  color: #4d4f46;
+  font-size: 0.61rem;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.device-controls {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 0.85rem;
+  padding-top: 0.7rem;
+}
+
+.adjustment-control {
+  position: relative;
+}
+
+.adjustment-control summary {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid #292a25;
+  border-radius: 0.25rem;
+  color: #20211d;
+  background: #ebe7d9;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1;
+  list-style: none;
+  place-items: center;
+  user-select: none;
+}
+
+.adjustment-control summary::-webkit-details-marker {
+  display: none;
+}
+
+.adjustment-control[open] summary {
+  color: #ebe7d9;
+  background: #20211d;
+}
+
+.amount-form {
+  position: absolute;
+  z-index: 1;
+  bottom: calc(100% + 0.5rem);
+  left: 50%;
+  width: 8.75rem;
+  border: 1px solid #292a25;
+  border-radius: 0.25rem;
+  background: #ebe7d9;
+  padding: 0.5rem;
+  transform: translateX(-50%);
 }
 
 .amount-form label {
   display: block;
-  margin-bottom: 0.5rem;
-  color: #555;
-  font-size: 0.78rem;
-  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: #5e6056;
+  font-size: 0.58rem;
 }
 
-.amount-controls {
+.amount-entry {
   display: grid;
-  grid-template-columns: 1fr 2.6rem 2.6rem;
-  gap: 0.45rem;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.25rem;
 }
 
-.amount-controls input,
-.amount-controls button {
-  min-width: 0;
-  height: 2.6rem;
-  border: 1px solid #cececa;
-  border-radius: 0.3rem;
-  background: #fafaf8;
+.amount-entry span {
+  color: #5e6056;
+  font-size: 0.75rem;
 }
 
-.amount-controls input {
+.amount-entry input {
   width: 100%;
-  padding: 0 0.75rem;
+  min-width: 0;
+  height: 1.65rem;
+  border: 1px solid #77786e;
+  border-radius: 0.15rem;
+  background: #f4f1e6;
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
 }
 
-.amount-controls button {
+.amount-entry button {
+  height: 1.65rem;
+  border: 1px solid #292a25;
+  border-radius: 0.15rem;
+  color: #ebe7d9;
+  background: #20211d;
+  padding: 0 0.35rem;
   cursor: pointer;
-  color: #fff;
-  background: #222;
-  font-size: 1.2rem;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.58rem;
 }
 
-.amount-controls input:focus-visible,
-.amount-controls button:focus-visible {
-  outline: 2px solid #555;
+.adjustment-control summary:focus-visible,
+.amount-entry input:focus-visible,
+.amount-entry button:focus-visible {
+  outline: 2px solid #292a25;
   outline-offset: 2px;
 }
 
 .empty-state {
-  padding: 3rem 1.5rem;
+  width: min(100%, 20rem);
+  border: 1px solid #77786e;
+  border-radius: 0.35rem;
+  padding: 2rem 1.25rem;
   text-align: center;
 }
 
-.empty-state p {
-  margin: 0.65rem 0 0;
+.empty-symbol {
+  margin-bottom: 0.75rem;
+  color: #77786e;
+  font-size: 0.7rem;
+}
+
+.empty-state h2 {
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.empty-state p:last-child {
+  margin-bottom: 0;
+  color: #6a6b62;
+  font-size: 0.75rem;
 }
 
 @media (max-width: 36rem) {
   .page-shell {
-    padding: 2rem 0;
+    padding-top: 1.75rem;
+  }
+
+  .identity-row {
+    display: block;
+  }
+
+  .salary {
+    margin-top: 0.35rem;
+  }
+
+  .envelope-grid {
+    grid-template-columns: minmax(0, 15.5rem);
   }
 }

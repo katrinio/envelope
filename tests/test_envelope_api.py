@@ -118,7 +118,10 @@ def test_envelope_page_shows_envelope_data(client: TestClient) -> None:
     assert "Home deposit" in response.text
     assert "25,000" in response.text
     assert "100,000" in response.text
-    assert f"amount-{envelope['id']}" in response.text
+    assert f"amount-increment-{envelope['id']}" in response.text
+    assert "€75,000 to go" in response.text
+    assert "<details" in response.text
+    assert '<details class="adjustment-control" open' not in response.text
 
 
 def test_envelope_page_progress_calculation(client: TestClient) -> None:
@@ -133,7 +136,7 @@ def test_envelope_page_progress_calculation(client: TestClient) -> None:
     assert "25%" in response.text
     assert 'aria-valuenow="25"' in response.text
     assert 'data-progress="25"' in response.text
-    assert response.text.count('class="progress-segment is-filled"') == 2
+    assert response.text.count('class="progress-segment is-filled"') == 5
 
 
 def test_envelope_page_empty_state(client: TestClient) -> None:

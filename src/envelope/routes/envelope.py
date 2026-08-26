@@ -38,6 +38,8 @@ class EnvelopeResponse(BaseModel):
 class EnvelopePageItem:
     envelope: Envelope
     progress_percentage: int
+    filled_segments: int
+    status_message: str
 
 
 def _get_envelope_or_404(envelope_id: int) -> Envelope:
@@ -54,6 +56,15 @@ def _set_current_amount(envelope: Envelope, current_amount: int) -> Envelope:
 
 def _calculate_progress_percentage(envelope: Envelope) -> int:
     return min(round(envelope.current_amount / envelope.target_amount * 100), 100)
+
+
+def _envelope_status(envelope: Envelope, progress_percentage: int) -> str:
+    remaining_amount = max(envelope.target_amount - envelope.current_amount, 0)
+    if remaining_amount == 0:
+        return "goal reached ✓"
+    if progress_percentage >= 85:
+        return "almost safe"
+    return f"€{remaining_amount:,} to go"
 
 
 @router.post(
@@ -102,13 +113,17 @@ def view_user_envelopes(request: Request, user_id: int) -> Response:
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    envelope_items = [
-        EnvelopePageItem(
-            envelope=envelope,
-            progress_percentage=_calculate_progress_percentage(envelope),
+    envelope_items = []
+    for envelope in Envelope.for_user(user_id):
+        progress_percentage = _calculate_progress_percentage(envelope)
+        envelope_items.append(
+            EnvelopePageItem(
+                envelope=envelope,
+                progress_percentage=progress_percentage,
+                filled_segments=round(progress_percentage / 5),
+                status_message=_envelope_status(envelope, progress_percentage),
+            )
         )
-        for envelope in Envelope.for_user(user_id)
-    ]
     return templates.TemplateResponse(
         request,
         "envelope/index.html",
