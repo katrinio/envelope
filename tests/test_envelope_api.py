@@ -1,6 +1,6 @@
 from calendar import month_name
 from collections.abc import Iterator
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -12,6 +12,16 @@ from src import database
 from src.app import app
 from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope
+from src.orm.spending import (
+    SIGNIFICANT_SPENDING_THRESHOLD,
+    ActualSpending,
+    MonthlySpendingCapacity,
+    PlannedSpending,
+    RoutineSpending,
+    RoutineSpendingSelection,
+    SpendingPool,
+    monthly_money_state,
+)
 from src.orm.user import User
 
 
@@ -138,6 +148,402 @@ def test_envelope_page_renders(client: TestClient) -> None:
     assert response.headers["cache-control"] == "no-cache"
 
 
+def test_section_tabs_render_with_monthly_spending_empty_by_default(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert 'data-section-tab="savings"' in response.text
+    assert 'data-section-tab="spending"' in response.text
+    assert 'data-section-content="spending" hidden' in response.text
+    script = client.get("/static/envelope.js")
+    assert "finpillow:active-section" in script.text
+    assert "setActiveSection(activeSection)" in script.text
+
+
+def test_monthly_spending_pool_and_planned_items_are_independent(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    pool_response = client.post(
+        f"/users/{user.id}/spending/amount",
+        data={"operation": "increment", "amount": "50000"},
+    )
+    item_response = client.post(
+        f"/users/{user.id}/spending/create",
+        data={"name": "Gloves", "amount": "8000"},
+    )
+
+    assert pool_response.status_code == 200
+    assert item_response.status_code == 200
+    assert SpendingPool.for_user(user.id).current_amount == 50_000
+    items = PlannedSpending.for_user(user.id)
+    assert len(items) == 1
+    assert items[0].name == "Gloves"
+    assert items[0].amount == 8_000
+
+
+def test_monthly_spending_uses_rsd_layout_and_clean_sections(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(50_000, "increment")
+    RoutineSpending.create(user_id=user.id, name="Boxing", default_amount=12_000)
+    PlannedSpending.create(user_id=user.id, name="Chair", amount=35_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert "AVAILABLE" in response.text
+    assert "ROUTINE" in response.text
+    assert "PLANNED" in response.text
+    assert "50,000 RSD" in response.text
+    assert "12,000 RSD" in response.text
+    assert "35,000 RSD" in response.text
+    spending_markup = response.text.split('class="spending-layout"', maxsplit=1)[1].split(
+        '<details class="insights-section recent-spending-section"',
+        maxsplit=1,
+    )[0]
+    assert "<details" not in spending_markup
+    assert 'class="spending-layout"' in response.text
+    assert 'class="spending-pool-free"' in response.text
+    assert 'class="spending-pool-planned"' in response.text
+    assert 'class="spending-pool-spent"' in response.text
+    assert 'data-editor-target="routine-add"' in response.text
+    assert 'data-editor-target="planned-add"' in response.text
+
+
+def test_routine_spending_can_be_created_edited_selected_and_deleted(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(10_000, "increment")
+
+    create_response = client.post(
+        f"/users/{user.id}/spending/routine/create",
+        data={"name": "Boxing", "amount": "12000"},
+    )
+    assert create_response.status_code == 200
+    routine = RoutineSpending.for_user(user.id)[0]
+    assert routine.name == "Boxing"
+    assert routine.default_amount == 12_000
+
+    edit_response = client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/edit",
+        data={"name": "Manicure", "amount": "3000"},
+    )
+    assert edit_response.status_code == 200
+    routine = RoutineSpending.get(routine.id)
+    assert routine is not None
+    assert routine.name == "Manicure"
+    assert routine.default_amount == 3_000
+
+    select_response = client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "2"},
+    )
+    assert select_response.status_code == 200
+    selection = RoutineSpendingSelection.for_month([routine.id], date.today().strftime("%Y-%m"))[routine.id]
+    assert selection.quantity == 2
+    page_response = client.get(f"/users/{user.id}/envelopes/page")
+    assert "2 × 3,000 = 6,000 RSD" in page_response.text  # noqa: RUF001
+
+    delete_response = client.post(f"/users/{user.id}/spending/routine/{routine.id}/delete")
+    assert delete_response.status_code == 200
+    assert RoutineSpending.get(routine.id) is None
+
+
+def test_routine_and_planned_do_not_deduct_available(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(50_000, "increment")
+
+    client.post(
+        f"/users/{user.id}/spending/routine/create",
+        data={"name": "Boxing", "amount": "12000"},
+    )
+    routine = RoutineSpending.for_user(user.id)[0]
+    client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "1"},
+    )
+    client.post(
+        f"/users/{user.id}/spending/planned/create",
+        data={"name": "Chair", "amount": "35000"},
+    )
+
+    assert SpendingPool.for_user(user.id).current_amount == 50_000
+    state = monthly_money_state(user.id, date.today().strftime("%Y-%m"))
+    assert state.capacity == 50_000
+    assert state.free == 38_000
+    assert state.planned == 12_000
+    assert state.spent == 0
+
+
+def test_spending_planned_routine_deducts_available_records_history_and_resets_selection(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(21_000, "increment")
+    routine = RoutineSpending.create(user_id=user.id, name="Box", default_amount=9_000)
+    client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "2"},
+    )
+
+    response = client.post(f"/users/{user.id}/spending/routine/{routine.id}/spend")
+
+    assert response.status_code == 200
+    assert SpendingPool.for_user(user.id).current_amount == 3_000
+    assert RoutineSpending.get(routine.id) is not None
+    assert RoutineSpendingSelection.for_month([routine.id], date.today().strftime("%Y-%m")) == {}
+    records = ActualSpending.for_user(user.id)
+    assert len(records) == 1
+    assert records[0].expense_name == "Box"
+    assert records[0].amount == 18_000
+    assert records[0].source_type == "routine"
+    assert records[0].routine_id == routine.id
+    assert records[0].planned_spending_id is None
+    state = monthly_money_state(user.id, date.today().strftime("%Y-%m"))
+    assert state.capacity == 21_000
+    assert state.free == 3_000
+    assert state.planned == 0
+    assert state.spent == 18_000
+
+
+def test_spending_planned_item_deducts_available_records_history_and_removes_item(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(50_000, "increment")
+    item = PlannedSpending.create(user_id=user.id, name="Chair", amount=35_000)
+
+    response = client.post(f"/users/{user.id}/spending/{item.id}/spend")
+
+    assert response.status_code == 200
+    assert SpendingPool.for_user(user.id).current_amount == 15_000
+    assert PlannedSpending.get(item.id) is None
+    records = ActualSpending.for_user(user.id)
+    assert len(records) == 1
+    assert records[0].expense_name == "Chair"
+    assert records[0].amount == 35_000
+    assert records[0].source_type == "planned"
+    assert records[0].planned_spending_id == item.id
+    assert records[0].month_key == date.today().strftime("%Y-%m")
+
+
+def test_spend_rejects_insufficient_available_without_changing_state(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(10_000, "increment")
+    item = PlannedSpending.create(user_id=user.id, name="Chair", amount=35_000)
+
+    response = client.post(f"/users/{user.id}/spending/{item.id}/spend")
+
+    assert response.status_code == 422
+    assert "Not enough available money." in response.text
+    assert SpendingPool.for_user(user.id).current_amount == 10_000
+    assert PlannedSpending.get(item.id) is not None
+    assert ActualSpending.for_user(user.id) == []
+
+
+def test_spend_actions_render_only_for_planned_states(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(10_000, "increment")
+    inactive = RoutineSpending.create(user_id=user.id, name="Boxing", default_amount=12_000)
+    active = RoutineSpending.create(user_id=user.id, name="Manicure", default_amount=3_000)
+    PlannedSpending.create(user_id=user.id, name="Chair", amount=35_000)
+    client.post(
+        f"/users/{user.id}/spending/routine/{active.id}/selection",
+        data={"selected": "1", "quantity": "2"},
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert f'routine-spend-{active.id}' in response.text
+    assert f'routine-spend-{inactive.id}' not in response.text
+    assert "planned-spend-" in response.text
+    assert "Deduct from Available?" in response.text
+
+
+def test_recent_spending_section_is_collapsed_and_uses_local_storage(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+    script_response = client.get("/static/envelope.js")
+
+    assert response.status_code == 200
+    details_tag = response.text.split(
+        '<details class="insights-section recent-spending-section"',
+        maxsplit=1,
+    )[1].split(">", maxsplit=1)[0]
+    assert "open" not in details_tag
+    assert "recent spending" in response.text
+    assert "No significant purchases in the last 3 months." in response.text
+    assert "monthly-spending:recent-spending-expanded" in script_response.text
+    assert "persistDetailsState(recentSpendingSection, recentSpendingStorageKey)" in script_response.text
+
+
+def test_recent_spending_shows_significant_planned_purchases_only(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    now = datetime.now()
+    current_month = now.strftime("%Y-%m")
+    previous_month_date = (now.replace(day=1) - timedelta(days=1)).replace(day=5)
+    previous_month = previous_month_date.strftime("%Y-%m")
+    old_month_date = (now.replace(day=1) - timedelta(days=100)).replace(day=5)
+    old_month = old_month_date.strftime("%Y-%m")
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="New shoes",
+        amount=8_500,
+        source_type="planned",
+        month_key=current_month,
+        spent_at=now,
+    )
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="Curtains",
+        amount=12_000,
+        source_type="planned",
+        month_key=current_month,
+        spent_at=now - timedelta(days=1),
+    )
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="Cleaning",
+        amount=6_000,
+        source_type="planned",
+        month_key=previous_month,
+        spent_at=previous_month_date,
+    )
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="Small cable",
+        amount=SIGNIFICANT_SPENDING_THRESHOLD - 1,
+        source_type="planned",
+        month_key=current_month,
+        spent_at=now,
+    )
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="Routine box",
+        amount=9_000,
+        source_type="routine",
+        month_key=current_month,
+        spent_at=now,
+    )
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="Old suitcase",
+        amount=20_000,
+        source_type="planned",
+        month_key=old_month,
+        spent_at=old_month_date,
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    recent_html = response.text.split('data-recent-spending-section', maxsplit=1)[1]
+    assert "3 purchases" in recent_html
+    assert "26,500 RSD" in recent_html
+    assert "NEW SHOES" in recent_html
+    assert "CURTAINS" in recent_html
+    assert "CLEANING" in recent_html
+    assert month_name[now.month].upper() in recent_html
+    assert month_name[previous_month_date.month].upper() in recent_html
+    assert "SMALL CABLE" not in recent_html
+    assert "ROUTINE BOX" not in recent_html
+    assert "OLD SUITCASE" not in recent_html
+
+
+def test_monthly_capacity_expands_with_additions_and_spending_does_not_rescale_free(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    month_key = date.today().strftime("%Y-%m")
+    SpendingPool.for_user(user.id).change_amount(21_000, "increment")
+    routine = RoutineSpending.create(user_id=user.id, name="Box", default_amount=9_000)
+    client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "1"},
+    )
+    client.post(f"/users/{user.id}/spending/routine/{routine.id}/spend")
+
+    state = monthly_money_state(user.id, month_key)
+    assert state.capacity == 21_000
+    assert state.free == 12_000
+    assert state.spent == 9_000
+    page = client.get(f"/users/{user.id}/envelopes/page")
+    assert 'class="spending-pool-free" style="height: 57.14285714285714%"' in page.text
+    assert 'class="spending-pool-spent" style="height: 42.857142857142854%"' in page.text
+
+    SpendingPool.for_user(user.id).change_amount(10_000, "increment")
+
+    state = monthly_money_state(user.id, month_key)
+    assert state.capacity == 31_000
+    assert state.free == 22_000
+    assert state.spent == 9_000
+
+
+def test_routine_selection_cannot_exceed_free_money(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(10_000, "increment")
+    routine = RoutineSpending.create(user_id=user.id, name="Box", default_amount=9_000)
+
+    response = client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "2"},
+    )
+
+    assert response.status_code == 422
+    assert "Not enough free money." in response.text
+    assert RoutineSpendingSelection.for_month([routine.id], date.today().strftime("%Y-%m")) == {}
+    assert monthly_money_state(user.id, date.today().strftime("%Y-%m")).free == 10_000
+
+
+def test_available_decrement_must_leave_capacity_for_planned_and_spent(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    month_key = date.today().strftime("%Y-%m")
+    SpendingPool.for_user(user.id).change_amount(21_000, "increment")
+    routine = RoutineSpending.create(user_id=user.id, name="Box", default_amount=9_000)
+    client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "1"},
+    )
+
+    response = client.post(
+        f"/users/{user.id}/spending/amount",
+        data={"operation": "decrement", "amount": "13000"},
+    )
+
+    assert response.status_code == 422
+    assert "Not enough free money." in response.text
+    state = monthly_money_state(user.id, month_key)
+    assert state.capacity == 21_000
+    assert state.free == 12_000
+    assert state.planned == 9_000
+    assert MonthlySpendingCapacity.for_user_month(user.id, month_key).capacity_amount == 21_000
+
+
+def test_planned_spending_can_be_edited_and_deleted(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    item = PlannedSpending.create(user_id=user.id, name="Trip", amount=2_000)
+
+    edit_response = client.post(
+        f"/users/{user.id}/spending/{item.id}/edit",
+        data={"name": "Novi Sad", "amount": "6000"},
+    )
+    assert edit_response.status_code == 200
+    edited = PlannedSpending.get(item.id)
+    assert edited is not None
+    assert edited.name == "Novi Sad"
+    assert edited.amount == 6_000
+
+    delete_response = client.post(f"/users/{user.id}/spending/{item.id}/delete")
+    assert delete_response.status_code == 200
+    assert PlannedSpending.get(item.id) is None
+
+
 def test_static_assets_use_safe_cache_policy(client: TestClient) -> None:
     versioned = client.get("/static/envelope.css?v=build-1")
     unversioned = client.get("/static/envelope.css")
@@ -146,6 +552,47 @@ def test_static_assets_use_safe_cache_policy(client: TestClient) -> None:
     assert versioned.headers["cache-control"] == "public, max-age=31536000, immutable"
     assert unversioned.status_code == 200
     assert unversioned.headers["cache-control"] == "no-cache"
+
+
+def test_refactored_static_modules_are_reachable(client: TestClient) -> None:
+    paths = [
+        "/static/css/base.css",
+        "/static/css/layout.css",
+        "/static/css/long-term.css",
+        "/static/css/monthly-spending.css",
+        "/static/css/modals.css",
+        "/static/js/state.js",
+        "/static/js/long-term.js",
+        "/static/js/monthly-spending.js",
+        "/static/js/modals.js",
+    ]
+
+    assert all(client.get(path).status_code == 200 for path in paths)
+
+
+def test_pwa_manifest_and_icons_are_served_as_assets(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    page = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert page.status_code == 200
+    assert "/static/icons/favicon.svg" in page.text
+    assert "/static/icons/apple-touch-icon.png" in page.text
+    assert "/static/manifest.webmanifest" in page.text
+    assert client.get("/static/manifest.webmanifest").headers["content-type"].startswith(
+        "application/manifest+json"
+    )
+    for icon in (
+        "favicon.ico",
+        "favicon.svg",
+        "apple-touch-icon.png",
+        "icon-192x192.png",
+        "icon-512x512.png",
+        "icon-maskable-192x192.png",
+        "icon-maskable-512x512.png",
+    ):
+        response = client.get(f"/static/icons/{icon}")
+        assert response.status_code == 200
+        assert not response.headers["content-type"].startswith("text/html")
 
 
 def test_username_is_lowercase_and_has_inline_editor(client: TestClient) -> None:
@@ -860,7 +1307,8 @@ def test_envelope_edit_menu_is_rendered(client: TestClient) -> None:
     assert "closeOtherInteractions" in script_response.text
     assert 'querySelectorAll(".adjustment-control")' in script_response.text
     assert 'long-term-savings:insights-expanded' in script_response.text
-    assert 'localStorage.setItem(insightsStorageKey, String(insightsSection.open))' in script_response.text
+    assert "persistDetailsState(insightsSection, insightsStorageKey)" in script_response.text
+    assert "window.localStorage.setItem(storageKey, String(details.open))" in script_response.text
 
 
 def test_history_panel_lists_transactions_newest_first(client: TestClient) -> None:

@@ -1,3 +1,6 @@
+// ==========================================
+// Общие интерактивные состояния и редакторы
+// ==========================================
 const menus = [...document.querySelectorAll(".device-menu")];
 const salaryEditor = document.querySelector("[data-salary-editor]");
 const usernameEditor = document.querySelector("[data-username-editor]");
@@ -8,25 +11,78 @@ const deleteDialogError = deleteDialog.querySelector(".delete-dialog-error");
 const historyDialog = document.querySelector("[data-history-dialog]");
 const historyBackdrop = document.querySelector("[data-history-backdrop]");
 const insightsSection = document.querySelector("[data-insights-section]");
+const recentSpendingSection = document.querySelector("[data-recent-spending-section]");
 const insightsStorageKey = "long-term-savings:insights-expanded";
+const recentSpendingStorageKey = "monthly-spending:recent-spending-expanded";
+const sectionStorageKey = "finpillow:active-section";
+const sectionTabs = [...document.querySelectorAll("[data-section-tab]")];
+const sectionContents = [...document.querySelectorAll("[data-section-content]")];
 let pendingDeleteButton = null;
 
-if (insightsSection) {
+// ==========================================
+// Персистентные настройки интерфейса
+// ==========================================
+function persistDetailsState(details, storageKey) {
   try {
-    insightsSection.open = window.localStorage.getItem(insightsStorageKey) === "true";
+    details.open = window.localStorage.getItem(storageKey) === "true";
   } catch {
     // Local UI preferences are optional when storage is unavailable.
   }
-  insightsSection.addEventListener("toggle", () => {
+  details.addEventListener("toggle", () => {
     try {
-      window.localStorage.setItem(insightsStorageKey, String(insightsSection.open));
+      window.localStorage.setItem(storageKey, String(details.open));
     } catch {
       // Ignore restricted or unavailable local storage.
     }
   });
 }
+
+function setActiveSection(section) {
+  for (const tab of sectionTabs) {
+    const active = tab.dataset.sectionTab === section;
+    tab.classList.toggle("is-active", active);
+    tab.setAttribute("aria-selected", String(active));
+    tab.setAttribute("aria-current", active ? "page" : "false");
+  }
+  for (const content of sectionContents) {
+    content.hidden = content.dataset.sectionContent !== section;
+  }
+}
+
+if (sectionTabs.length) {
+  let activeSection = "savings";
+  try {
+    const savedSection = window.localStorage.getItem(sectionStorageKey);
+    if (savedSection === "spending" || savedSection === "savings") {
+      activeSection = savedSection;
+    }
+  } catch {
+    // Local UI preferences are optional when storage is unavailable.
+  }
+  setActiveSection(activeSection);
+  for (const tab of sectionTabs) {
+    tab.addEventListener("click", () => {
+      const section = tab.dataset.sectionTab;
+      setActiveSection(section);
+      try {
+        window.localStorage.setItem(sectionStorageKey, section);
+      } catch {
+        // Ignore restricted or unavailable local storage.
+      }
+    });
+  }
+}
+
+if (insightsSection) {
+  persistDetailsState(insightsSection, insightsStorageKey);
+}
+
+if (recentSpendingSection) {
+  persistDetailsState(recentSpendingSection, recentSpendingStorageKey);
+}
 let closeSalaryEditor = null;
 let closeUsernameEditor = null;
+let closeSpendingEditor = null;
 
 function closeOtherInteractions(except = null) {
   if (closeSalaryEditor && except !== "salary") {
@@ -39,6 +95,9 @@ function closeOtherInteractions(except = null) {
     if (details !== except) {
       details.removeAttribute("open");
     }
+  }
+  if (closeSpendingEditor && except !== "spending-editor") {
+    closeSpendingEditor();
   }
   for (const menu of menus) {
     if (menu !== except) {
@@ -147,6 +206,7 @@ function closeMenu(menu, restoreFocus = false) {
 }
 
 function openMenu(menu, focusFirstItem = false) {
+  closeOtherInteractions(menu);
   for (const otherMenu of menus) {
     if (otherMenu !== menu) {
       closeMenu(otherMenu);
@@ -168,7 +228,6 @@ for (const menu of menus) {
   const items = [...popup.querySelectorAll('[role="menuitem"]')];
 
   trigger.addEventListener("click", () => {
-    closeOtherInteractions(menu);
     if (popup.hidden) {
       openMenu(menu);
     } else {
@@ -200,12 +259,14 @@ for (const menu of menus) {
   });
 
   const deleteButton = popup.querySelector("[data-delete-envelope]");
-  deleteButton.addEventListener("click", () => {
-    pendingDeleteButton = deleteButton;
-    deleteDialogError.hidden = true;
-    closeMenu(menu);
-    deleteDialog.showModal();
-  });
+  if (deleteButton) {
+    deleteButton.addEventListener("click", () => {
+      pendingDeleteButton = deleteButton;
+      deleteDialogError.hidden = true;
+      closeMenu(menu);
+      deleteDialog.showModal();
+    });
+  }
 }
 
 for (const details of document.querySelectorAll(".adjustment-control")) {
@@ -213,6 +274,70 @@ for (const details of document.querySelectorAll(".adjustment-control")) {
     if (!details.open) {
       closeOtherInteractions(details);
     }
+  });
+}
+
+const spendingEditors = [...document.querySelectorAll("[data-spending-editor]")];
+
+function openSpendingEditor(editor, activeTrigger = null) {
+  closeOtherInteractions("spending-editor");
+  closeSpendingEditor = () => {
+    for (const openEditor of spendingEditors) {
+      openEditor.hidden = true;
+    }
+    for (const trigger of document.querySelectorAll("[data-editor-trigger][aria-expanded]")) {
+      trigger.setAttribute("aria-expanded", "false");
+    }
+    closeSpendingEditor = null;
+  };
+  editor.hidden = false;
+  activeTrigger?.setAttribute("aria-expanded", "true");
+  const firstInput = editor.querySelector("input");
+  firstInput?.focus();
+  firstInput?.select();
+}
+
+for (const trigger of document.querySelectorAll("[data-editor-trigger]")) {
+  trigger.addEventListener("click", (event) => {
+    const targetId = trigger.dataset.editorTarget;
+    const editor = targetId
+      ? document.getElementById(targetId)
+      : trigger.closest("[data-spending-editor]")?.querySelector("form");
+    if (!editor) {
+      return;
+    }
+    event.preventDefault();
+    if (!editor.hidden) {
+      closeSpendingEditor?.();
+      return;
+    }
+    openSpendingEditor(editor, trigger);
+  });
+}
+
+for (const button of document.querySelectorAll("[data-editor-cancel]")) {
+  button.addEventListener("click", () => {
+    closeSpendingEditor?.();
+  });
+}
+
+for (const editor of spendingEditors) {
+  editor.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSpendingEditor?.();
+    }
+  });
+}
+
+for (const input of document.querySelectorAll("[data-routine-quantity]")) {
+  input.addEventListener("change", () => {
+    const form = input.closest("form");
+    const selectedMarker = form?.querySelector("[data-routine-selected-marker]");
+    if (selectedMarker) {
+      selectedMarker.disabled = false;
+    }
+    form?.requestSubmit();
   });
 }
 

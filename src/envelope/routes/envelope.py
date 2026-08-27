@@ -17,6 +17,17 @@ from src.envelope.service import (
 )
 from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope, EnvelopeKind
+from src.orm.spending import (
+    SIGNIFICANT_SPENDING_THRESHOLD,
+    ActualSpending,
+    PlannedSpending,
+    RoutineSpending,
+    RoutineSpendingSelection,
+    SpendingPool,
+    monthly_money_state,
+    spend_planned_item,
+    spend_routine_for_month,
+)
 from src.orm.user import User
 from src.template import templates
 
@@ -139,6 +150,37 @@ class HistoryEditForm:
     error: str | None = None
 
 
+@dataclass(frozen=True)
+class SpendingForm:
+    name: str = ""
+    amount: str = ""
+    item_id: int | None = None
+    item_kind: str = "planned"
+    quantity: str = "1"
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class RoutinePageItem:
+    routine: RoutineSpending
+    is_selected: bool
+    quantity: int
+    monthly_amount: int
+
+
+@dataclass(frozen=True)
+class RecentSpendingMonth:
+    label: str
+    purchases: list[ActualSpending]
+
+
+@dataclass(frozen=True)
+class RecentSpendingSummary:
+    purchases_count: int
+    total_amount: int
+    months: list[RecentSpendingMonth]
+
+
 def _get_envelope_or_404(envelope_id: int) -> Envelope:
     envelope = Envelope.get(envelope_id)
     if envelope is None:
@@ -168,6 +210,44 @@ def _envelope_status(
     return f"€{remaining_amount:,} to go"
 
 
+def _recent_month_keys(today: date) -> list[str]:
+    month_keys = []
+    year = today.year
+    month = today.month
+    for _ in range(3):
+        month_keys.append(f"{year:04d}-{month:02d}")
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    return month_keys
+
+
+def _build_recent_spending_summary(user_id: int, today: date) -> RecentSpendingSummary:
+    month_keys = _recent_month_keys(today)
+    purchases = ActualSpending.significant_planned_for_months(
+        user_id,
+        month_keys,
+        SIGNIFICANT_SPENDING_THRESHOLD,
+    )
+    purchases_by_month: dict[str, list[ActualSpending]] = {month_key: [] for month_key in month_keys}
+    for purchase in purchases:
+        purchases_by_month.setdefault(purchase.month_key, []).append(purchase)
+    months = [
+        RecentSpendingMonth(
+            label=month_name[int(month_key[-2:])].upper(),
+            purchases=purchases_by_month[month_key],
+        )
+        for month_key in month_keys
+        if purchases_by_month.get(month_key)
+    ]
+    return RecentSpendingSummary(
+        purchases_count=len(purchases),
+        total_amount=sum(purchase.amount for purchase in purchases),
+        months=months,
+    )
+
+
 def _render_envelope_page(
     request: Request,
     user: User,
@@ -180,9 +260,34 @@ def _render_envelope_page(
     history_envelope_id: int | None = None,
     history_edit_transaction: Contribution | None = None,
     history_edit_form: HistoryEditForm | None = None,
+    spending_form: SpendingForm | None = None,
     status_code: int = status.HTTP_200_OK,
 ) -> Response:
     envelopes = Envelope.for_user(user.id)
+    spending_pool = SpendingPool.for_user(user.id)
+    planned_spending = PlannedSpending.for_user(user.id)
+    today = date.today()
+    current_spending_month = today.strftime("%Y-%m")
+    spending_state = monthly_money_state(user.id, current_spending_month)
+    recent_spending = _build_recent_spending_summary(user.id, today)
+    routine_spending = RoutineSpending.for_user(user.id)
+    routine_selections = RoutineSpendingSelection.for_month(
+        [routine.id for routine in routine_spending],
+        current_spending_month,
+    )
+    routine_items = [
+        RoutinePageItem(
+            routine=routine,
+            is_selected=routine.id in routine_selections,
+            quantity=routine_selections[routine.id].quantity if routine.id in routine_selections else 1,
+            monthly_amount=(
+                routine.default_amount * routine_selections[routine.id].quantity
+                if routine.id in routine_selections
+                else routine.default_amount
+            ),
+        )
+        for routine in routine_spending
+    ]
     regular_contributions = Contribution.regular_for_user(user.id)
     contributions_by_envelope: dict[int, list[tuple[int, datetime]]] = {}
     for contribution in regular_contributions:
@@ -265,6 +370,13 @@ def _render_envelope_page(
             "history_days": history_days,
             "history_edit_transaction": history_edit_transaction,
             "history_edit_form": history_edit_form,
+            "spending_pool": spending_pool,
+            "spending_state": spending_state,
+            "routine_items": routine_items,
+            "planned_spending": planned_spending,
+            "spending_form": spending_form,
+            "current_spending_month": current_spending_month,
+            "recent_spending": recent_spending,
             "has_financial_pillow": any(envelope.is_financial_pillow for envelope in envelopes),
             "financial_pillow_target": (
                 calculate_financial_pillow_target(
@@ -324,6 +436,285 @@ def reorder_user_envelopes(user_id: int, payload: EnvelopeOrderUpdate) -> list[E
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(error),
         ) from error
+
+
+@router.post("/users/{user_id}/spending/amount", response_class=HTMLResponse)
+def change_spending_amount(
+    request: Request,
+    user_id: int,
+    operation: Annotated[Literal["increment", "decrement"], Form()],
+    amount: Annotated[str, Form()] = "",
+) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    pool = SpendingPool.for_user(user_id)
+    try:
+        pool.change_amount(int(amount), operation)
+    except (ValueError, TypeError) as error:
+        return _render_envelope_page(
+            request,
+            user,
+            spending_form=SpendingForm(amount=amount, item_kind="available", error=str(error)),
+            status_code=422,
+        )
+    return RedirectResponse(request.url_for("view_user_envelopes", user_id=user_id), status_code=303)
+
+
+@router.post("/users/{user_id}/spending/create", response_class=HTMLResponse)
+@router.post("/users/{user_id}/spending/planned/create", response_class=HTMLResponse)
+def create_planned_spending(
+    request: Request,
+    user_id: int,
+    name: Annotated[str, Form()] = "",
+    amount: Annotated[str, Form()] = "",
+) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    normalized_name = name.strip()
+    error: str | None = None
+    try:
+        parsed_amount = int(amount)
+        if parsed_amount <= 0:
+            error = "Use an amount above 0."
+    except (ValueError, TypeError):
+        parsed_amount = 0
+        error = "Enter a whole amount."
+    if not normalized_name:
+        error = "Add a name."
+    if error:
+        return _render_envelope_page(
+            request,
+            user,
+            spending_form=SpendingForm(name=name, amount=amount, item_kind="planned", error=error),
+            status_code=422,
+        )
+    PlannedSpending.create(user_id=user_id, name=normalized_name, amount=parsed_amount)
+    return RedirectResponse(request.url_for("view_user_envelopes", user_id=user_id), status_code=303)
+
+
+@router.post("/users/{user_id}/spending/{item_id}/edit", response_class=HTMLResponse)
+def edit_planned_spending(
+    request: Request,
+    user_id: int,
+    item_id: int,
+    name: Annotated[str, Form()] = "",
+    amount: Annotated[str, Form()] = "",
+) -> Response:
+    user = User.get(user_id)
+    item = PlannedSpending.get(item_id)
+    if user is None or item is None or item.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Planned spending not found")
+    try:
+        parsed_amount = int(amount)
+        if parsed_amount <= 0:
+            raise ValueError("Use an amount above 0.")
+        if not name.strip():
+            raise ValueError("Add a name.")
+        item.name = name.strip()
+        item.amount = parsed_amount
+        item.save()
+    except (ValueError, TypeError) as error:
+        return _render_envelope_page(
+            request,
+            user,
+            spending_form=SpendingForm(
+                name=name,
+                amount=amount,
+                item_id=item_id,
+                item_kind="planned",
+                error=str(error),
+            ),
+            status_code=422,
+        )
+    return RedirectResponse(request.url_for("view_user_envelopes", user_id=user_id), status_code=303)
+
+
+@router.post("/users/{user_id}/spending/{item_id}/delete", response_class=HTMLResponse)
+def delete_planned_spending(user_id: int, item_id: int) -> Response:
+    user = User.get(user_id)
+    item = PlannedSpending.get(item_id)
+    if user is None or item is None or item.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Planned spending not found")
+    item.delete()
+    return RedirectResponse(f"/users/{user_id}/envelopes/page", status_code=303)
+
+
+@router.post("/users/{user_id}/spending/{item_id}/spend", response_class=HTMLResponse)
+def spend_planned_spending(
+    request: Request,
+    user_id: int,
+    item_id: int,
+) -> Response:
+    user = User.get(user_id)
+    item = PlannedSpending.get(item_id)
+    if user is None or item is None or item.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Planned spending not found")
+    try:
+        spend_planned_item(user_id, item_id, date.today().strftime("%Y-%m"))
+    except ValueError as error:
+        return _render_envelope_page(
+            request,
+            user,
+            spending_form=SpendingForm(
+                item_id=item_id,
+                item_kind="planned-spend",
+                error=str(error),
+            ),
+            status_code=422,
+        )
+    return RedirectResponse(request.url_for("view_user_envelopes", user_id=user_id), status_code=303)
+
+
+@router.post("/users/{user_id}/spending/routine/create", response_class=HTMLResponse)
+def create_routine_spending(
+    request: Request,
+    user_id: int,
+    name: Annotated[str, Form()] = "",
+    amount: Annotated[str, Form()] = "",
+) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    normalized_name = name.strip()
+    error: str | None = None
+    try:
+        parsed_amount = int(amount)
+        if parsed_amount <= 0:
+            error = "Use an amount above 0."
+    except (ValueError, TypeError):
+        parsed_amount = 0
+        error = "Enter a whole amount."
+    if not normalized_name:
+        error = "Add a name."
+    if error:
+        return _render_envelope_page(
+            request,
+            user,
+            spending_form=SpendingForm(name=name, amount=amount, item_kind="routine", error=error),
+            status_code=422,
+        )
+    RoutineSpending.create(user_id=user_id, name=normalized_name, default_amount=parsed_amount)
+    return RedirectResponse(request.url_for("view_user_envelopes", user_id=user_id), status_code=303)
+
+
+@router.post("/users/{user_id}/spending/routine/{item_id}/edit", response_class=HTMLResponse)
+def edit_routine_spending(
+    request: Request,
+    user_id: int,
+    item_id: int,
+    name: Annotated[str, Form()] = "",
+    amount: Annotated[str, Form()] = "",
+) -> Response:
+    user = User.get(user_id)
+    item = RoutineSpending.get(item_id)
+    if user is None or item is None or item.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Routine spending not found")
+    try:
+        parsed_amount = int(amount)
+        if parsed_amount <= 0:
+            raise ValueError("Use an amount above 0.")
+        if not name.strip():
+            raise ValueError("Add a name.")
+        item.name = name.strip()
+        item.default_amount = parsed_amount
+        item.save()
+    except (ValueError, TypeError) as error:
+        return _render_envelope_page(
+            request,
+            user,
+            spending_form=SpendingForm(
+                name=name,
+                amount=amount,
+                item_id=item_id,
+                item_kind="routine",
+                error=str(error),
+            ),
+            status_code=422,
+        )
+    return RedirectResponse(request.url_for("view_user_envelopes", user_id=user_id), status_code=303)
+
+
+@router.post("/users/{user_id}/spending/routine/{item_id}/delete", response_class=HTMLResponse)
+def delete_routine_spending(user_id: int, item_id: int) -> Response:
+    user = User.get(user_id)
+    item = RoutineSpending.get(item_id)
+    if user is None or item is None or item.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Routine spending not found")
+    item.delete()
+    return RedirectResponse(f"/users/{user_id}/envelopes/page", status_code=303)
+
+
+@router.post("/users/{user_id}/spending/routine/{item_id}/spend", response_class=HTMLResponse)
+def spend_routine_spending(
+    request: Request,
+    user_id: int,
+    item_id: int,
+) -> Response:
+    user = User.get(user_id)
+    item = RoutineSpending.get(item_id)
+    if user is None or item is None or item.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Routine spending not found")
+    try:
+        spend_routine_for_month(user_id, item_id, date.today().strftime("%Y-%m"))
+    except ValueError as error:
+        return _render_envelope_page(
+            request,
+            user,
+            spending_form=SpendingForm(
+                item_id=item_id,
+                item_kind="routine-spend",
+                error=str(error),
+            ),
+            status_code=422,
+        )
+    return RedirectResponse(request.url_for("view_user_envelopes", user_id=user_id), status_code=303)
+
+
+@router.post("/users/{user_id}/spending/routine/{item_id}/selection", response_class=HTMLResponse)
+def update_routine_spending_selection(
+    request: Request,
+    user_id: int,
+    item_id: int,
+    selected: Annotated[str | None, Form()] = None,
+    quantity: Annotated[str, Form()] = "1",
+) -> Response:
+    user = User.get(user_id)
+    item = RoutineSpending.get(item_id)
+    if user is None or item is None or item.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Routine spending not found")
+    month_key = date.today().strftime("%Y-%m")
+    try:
+        parsed_quantity = int(quantity)
+        selections = RoutineSpendingSelection.for_month([item_id], month_key)
+        previous_amount = (
+            item.default_amount * selections[item_id].quantity
+            if item_id in selections
+            else 0
+        )
+        next_amount = item.default_amount * parsed_quantity if selected else 0
+        spending_state = monthly_money_state(user_id, month_key)
+        if next_amount > spending_state.free + previous_amount:
+            raise ValueError("Not enough free money.")
+        RoutineSpendingSelection.set_for_month(
+            routine_id=item_id,
+            month_key=month_key,
+            quantity=parsed_quantity if selected else None,
+        )
+    except (ValueError, TypeError) as error:
+        return _render_envelope_page(
+            request,
+            user,
+            spending_form=SpendingForm(
+                item_id=item_id,
+                item_kind="routine-selection",
+                quantity=quantity,
+                error=str(error),
+            ),
+            status_code=422,
+        )
+    return RedirectResponse(request.url_for("view_user_envelopes", user_id=user_id), status_code=303)
 
 
 @router.get("/envelopes/{envelope_id}", response_model=EnvelopeResponse)

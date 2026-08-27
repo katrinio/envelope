@@ -9,6 +9,7 @@ from src.database import Base
 
 if TYPE_CHECKING:
     from src.orm.envelope import Envelope
+    from src.orm.spending import PlannedSpending, RoutineSpending, SpendingPool
 
 
 class User(Base):
@@ -21,6 +22,15 @@ class User(Base):
     envelopes: Mapped[list[Envelope]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    spending_pool: Mapped[SpendingPool | None] = relationship(
+        back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
+    planned_spending: Mapped[list[PlannedSpending]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    routine_spending: Mapped[list[RoutineSpending]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
     )
 
     def update_salary(self, salary: int) -> Self:
