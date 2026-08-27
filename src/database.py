@@ -66,7 +66,7 @@ class Base(DeclarativeBase):
 
 def init_database() -> None:
     # Import models before create_all so that they are registered in Base.metadata.
-    from src.orm import contribution, envelope, user  # noqa: F401
+    from src.orm import contribution, envelope, spending, user  # noqa: F401
 
     Base.metadata.create_all(engine)
 

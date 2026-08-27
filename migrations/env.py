@@ -4,7 +4,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from src.database import Base, database_url
-from src.orm import contribution, envelope, user  # noqa: F401
+from src.orm import contribution, envelope, spending, user  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))

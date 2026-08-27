@@ -12,6 +12,7 @@ from src import database
 from src.app import app
 from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope
+from src.orm.spending import PlannedSpending, SpendingPool
 from src.orm.user import User
 
 
@@ -150,6 +151,46 @@ def test_section_tabs_render_with_monthly_spending_empty_by_default(client: Test
     script = client.get("/static/envelope.js")
     assert "finpillow:active-section" in script.text
     assert "setActiveSection(activeSection)" in script.text
+
+
+def test_monthly_spending_pool_and_planned_items_are_independent(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    pool_response = client.post(
+        f"/users/{user.id}/spending/amount",
+        data={"operation": "increment", "amount": "50000"},
+    )
+    item_response = client.post(
+        f"/users/{user.id}/spending/create",
+        data={"name": "Gloves", "amount": "8000"},
+    )
+
+    assert pool_response.status_code == 200
+    assert item_response.status_code == 200
+    assert SpendingPool.for_user(user.id).current_amount == 50_000
+    items = PlannedSpending.for_user(user.id)
+    assert len(items) == 1
+    assert items[0].name == "Gloves"
+    assert items[0].amount == 8_000
+
+
+def test_planned_spending_can_be_edited_and_deleted(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    item = PlannedSpending.create(user_id=user.id, name="Trip", amount=2_000)
+
+    edit_response = client.post(
+        f"/users/{user.id}/spending/{item.id}/edit",
+        data={"name": "Novi Sad", "amount": "6000"},
+    )
+    assert edit_response.status_code == 200
+    edited = PlannedSpending.get(item.id)
+    assert edited is not None
+    assert edited.name == "Novi Sad"
+    assert edited.amount == 6_000
+
+    delete_response = client.post(f"/users/{user.id}/spending/{item.id}/delete")
+    assert delete_response.status_code == 200
+    assert PlannedSpending.get(item.id) is None
 
 
 def test_static_assets_use_safe_cache_policy(client: TestClient) -> None:

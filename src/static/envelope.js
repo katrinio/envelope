@@ -255,6 +255,14 @@ for (const details of document.querySelectorAll(".adjustment-control")) {
   });
 }
 
+for (const button of document.querySelectorAll("[data-planned-delete]")) {
+  button.addEventListener("click", (event) => {
+    if (!window.confirm("Permanently delete this planned expense? This action cannot be undone.")) {
+      event.preventDefault();
+    }
+  });
+}
+
 const envelopeGrid = document.querySelector("[data-envelope-grid]");
 let draggedEnvelope = null;
 let dropPlaceholder = null;

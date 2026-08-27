@@ -611,7 +611,54 @@
       </div>
 
       <section class="section-content monthly-spending" data-section-content="spending" hidden>
-        <span class="sr-only">Monthly spending</span>
+        <div class="spending-layout">
+          <section class="spending-pool-device">
+            <p class="spending-label">Available</p>
+            <div class="spending-pool-scale" aria-hidden="true">
+              <div class="spending-pool-fill" style="height: {{ '100%' if spending_pool.current_amount else '0%' }}"></div>
+            </div>
+            <p class="spending-pool-amount">€{{ "{:,}".format(spending_pool.current_amount) }}</p>
+            <p class="spending-secondary">available</p>
+            <div class="spending-pool-controls">
+              {% for operation, symbol in [('decrement', '−'), ('increment', '+')] %}
+                <details class="spending-adjustment">
+                  <summary aria-label="{{ 'Decrease' if operation == 'decrement' else 'Increase' }} available amount">{{ symbol }}</summary>
+                  <form action="{{ url_for('change_spending_amount', user_id=user.id) }}" method="post">
+                    <input name="amount" type="number" min="1" step="1" required>
+                    <button name="operation" value="{{ operation }}" type="submit">OK</button>
+                  </form>
+                </details>
+              {% endfor %}
+            </div>
+            {% if spending_form and spending_form.error %}
+              <p class="spending-error">{{ spending_form.error }}</p>
+            {% endif %}
+          </section>
+          <section class="planned-spending">
+            <h2>Planned spending</h2>
+            <div class="planned-list">
+              {% for item in planned_spending %}
+                <details class="planned-item">
+                  <summary><span>{{ item.name }}</span><strong>€{{ "{:,}".format(item.amount) }}</strong></summary>
+                  <form class="planned-edit-form" action="{{ url_for('edit_planned_spending', user_id=user.id, item_id=item.id) }}" method="post">
+                    <input name="name" value="{{ item.name }}" required>
+                    <input name="amount" type="number" min="1" value="{{ item.amount }}" required>
+                    <button type="submit">Save</button>
+                    <button data-planned-delete formaction="{{ url_for('delete_planned_spending', user_id=user.id, item_id=item.id) }}" formmethod="post" type="submit">Delete</button>
+                  </form>
+                </details>
+              {% endfor %}
+              <details class="planned-add">
+                <summary>+ Add</summary>
+                <form action="{{ url_for('create_planned_spending', user_id=user.id) }}" method="post">
+                  <input name="name" placeholder="Name" value="{{ spending_form.name if spending_form and not spending_form.item_id else '' }}" required>
+                  <input name="amount" type="number" min="1" placeholder="Amount" value="{{ spending_form.amount if spending_form and not spending_form.item_id else '' }}" required>
+                  <button type="submit">Add</button>
+                </form>
+              </details>
+            </div>
+          </section>
+        </div>
       </section>
     </main>
 

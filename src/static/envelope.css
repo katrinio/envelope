@@ -91,6 +91,140 @@ input[type="number"]::-webkit-outer-spin-button {
   min-height: 8rem;
 }
 
+.spending-layout {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(18rem, 1.2fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+.spending-pool-device,
+.planned-spending {
+  border: 1px solid var(--border);
+  background: var(--device-background);
+  padding: 1rem;
+}
+
+.spending-label,
+.planned-spending h2 {
+  margin: 0 0 0.8rem;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.spending-pool-scale {
+  display: flex;
+  align-items: end;
+  height: 11rem;
+  border: 1px solid var(--display-border);
+  background: var(--display-background);
+}
+
+.spending-pool-fill {
+  width: 100%;
+  background: var(--segment-fill);
+}
+
+.spending-pool-amount {
+  margin: 0.8rem 0 0;
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+
+.spending-secondary {
+  margin: 0.15rem 0 0.8rem;
+  color: var(--secondary-text);
+  font-size: 0.65rem;
+}
+
+.spending-error {
+  margin: 0.6rem 0 0;
+  color: var(--secondary-text);
+  font-size: 0.6rem;
+}
+
+.spending-pool-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.spending-adjustment summary,
+.planned-add summary {
+  cursor: pointer;
+  color: var(--secondary-text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.65rem;
+  list-style: none;
+}
+
+.spending-adjustment summary::-webkit-details-marker,
+.planned-add summary::-webkit-details-marker,
+.planned-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.spending-adjustment form,
+.planned-edit-form,
+.planned-add form {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.spending-adjustment input,
+.planned-edit-form input,
+.planned-add input {
+  width: 6rem;
+  min-width: 0;
+  border: 1px solid var(--display-border);
+  background: var(--control-background);
+  padding: 0.3rem;
+  font-size: 0.7rem;
+}
+
+.planned-list {
+  border-top: 1px solid var(--border);
+}
+
+.planned-item,
+.planned-add {
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0;
+}
+
+.planned-item summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  list-style: none;
+  text-transform: uppercase;
+}
+
+.planned-item summary strong {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.planned-edit-form {
+  flex-wrap: wrap;
+}
+
+.planned-edit-form button,
+.planned-add button,
+.spending-adjustment button {
+  border: 1px solid var(--border);
+  color: var(--primary-text);
+  background: transparent;
+  padding: 0.25rem 0.4rem;
+  cursor: pointer;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.55rem;
+  text-transform: uppercase;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1675,5 +1809,9 @@ h1 {
 
   .envelope-grid {
     grid-template-columns: minmax(0, 15.5rem);
+  }
+
+  .spending-layout {
+    grid-template-columns: 1fr;
   }
 }
