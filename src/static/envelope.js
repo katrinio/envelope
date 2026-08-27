@@ -5,6 +5,7 @@ const deleteDialogCancel = deleteDialog.querySelector("[data-delete-cancel]");
 const deleteDialogConfirm = deleteDialog.querySelector("[data-delete-confirm]");
 const deleteDialogError = deleteDialog.querySelector(".delete-dialog-error");
 const historyDialog = document.querySelector("[data-history-dialog]");
+const historyBackdrop = document.querySelector("[data-history-backdrop]");
 let pendingDeleteButton = null;
 
 if (historyDialog) {
@@ -17,6 +18,10 @@ if (historyDialog) {
       historyDialog.close();
       window.location.href = closeUrl;
     }
+  });
+  historyBackdrop?.addEventListener("click", () => {
+    historyDialog.close();
+    window.location.href = closeUrl;
   });
 }
 

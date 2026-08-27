@@ -815,6 +815,60 @@ def test_history_panel_lists_transactions_newest_first(client: TestClient) -> No
     assert "Permanently delete this transaction? This action cannot be undone." in response.text
 
 
+def test_history_modal_has_viewport_backdrop_and_close_control(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(user_id=user.id, name="Trip", target_amount=1_000, priority=1)
+
+    response = client.get(
+        f"/users/{user.id}/envelopes/page?history_envelope_id={envelope.id}"
+    )
+    stylesheet = Path("src/static/envelope.css").read_text()
+
+    assert 'data-history-backdrop aria-hidden="true"' in response.text
+    assert 'aria-label="Close history"' in response.text
+    assert "background: rgb(0 0 0 / 22%)" in stylesheet
+    assert "z-index: 1000" in stylesheet
+    assert "z-index: 1001" in stylesheet
+
+
+def test_history_cannot_be_opened_for_another_users_envelope(client: TestClient) -> None:
+    owner = User.create(userId=1, username="alice", salary=1_500)
+    other_user = User.create(userId=2, username="bob", salary=1_500)
+    envelope = Envelope.create(user_id=other_user.id, name="Private", target_amount=1_000, priority=1)
+
+    response = client.get(
+        f"/users/{owner.id}/envelopes/page?history_envelope_id={envelope.id}"
+    )
+
+    assert response.status_code == 404
+
+
+def test_history_editing_withdrawal_recalculates_balance(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=100,
+        target_amount=1_000,
+        priority=1,
+    )
+    transaction = Contribution.withdraw_from_envelope(envelope.id, 30)
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/{envelope.id}/history/{transaction.id}/edit",
+        data={"amount": "50", "transaction_date": "2026-08-26"},
+    )
+
+    assert response.status_code == 200
+    stored_envelope = Envelope.get(envelope.id)
+    stored_transaction = Contribution.get(transaction.id)
+    assert stored_envelope is not None
+    assert stored_transaction is not None
+    assert stored_envelope.current_amount == 50
+    assert stored_transaction.is_withdrawal is True
+    assert stored_transaction.is_regular is False
+
+
 def test_history_edit_recalculates_balance_and_regular_status(client: TestClient) -> None:
     user = User.create(userId=1, username="alice", salary=1_500)
     envelope = Envelope.create(
