@@ -8,6 +8,9 @@
     <script src="{{ url_for('static', path='/envelope.js') }}?v=envelope-delete-dialog-1" defer></script>
   </head>
   <body>
+    {% if history_envelope_id is not none %}
+      <div class="history-backdrop" data-history-backdrop aria-hidden="true"></div>
+    {% endif %}
     <main class="page-shell">
       <header class="page-header">
         <p class="eyebrow">Long-term savings</p>
