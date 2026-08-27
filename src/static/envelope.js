@@ -1,12 +1,51 @@
 const menus = [...document.querySelectorAll(".device-menu")];
 const salaryEditor = document.querySelector("[data-salary-editor]");
+const usernameEditor = document.querySelector("[data-username-editor]");
 const deleteDialog = document.querySelector("[data-delete-dialog]");
 const deleteDialogCancel = deleteDialog.querySelector("[data-delete-cancel]");
 const deleteDialogConfirm = deleteDialog.querySelector("[data-delete-confirm]");
 const deleteDialogError = deleteDialog.querySelector(".delete-dialog-error");
 const historyDialog = document.querySelector("[data-history-dialog]");
 const historyBackdrop = document.querySelector("[data-history-backdrop]");
+const insightsSection = document.querySelector("[data-insights-section]");
+const insightsStorageKey = "long-term-savings:insights-expanded";
 let pendingDeleteButton = null;
+
+if (insightsSection) {
+  try {
+    insightsSection.open = window.localStorage.getItem(insightsStorageKey) === "true";
+  } catch {
+    // Local UI preferences are optional when storage is unavailable.
+  }
+  insightsSection.addEventListener("toggle", () => {
+    try {
+      window.localStorage.setItem(insightsStorageKey, String(insightsSection.open));
+    } catch {
+      // Ignore restricted or unavailable local storage.
+    }
+  });
+}
+let closeSalaryEditor = null;
+let closeUsernameEditor = null;
+
+function closeOtherInteractions(except = null) {
+  if (closeSalaryEditor && except !== "salary") {
+    closeSalaryEditor();
+  }
+  if (closeUsernameEditor && except !== "username") {
+    closeUsernameEditor();
+  }
+  for (const details of document.querySelectorAll(".adjustment-control[open]")) {
+    if (details !== except) {
+      details.removeAttribute("open");
+    }
+  }
+  for (const menu of menus) {
+    if (menu !== except) {
+      closeMenu(menu);
+    }
+  }
+}
 
 if (historyDialog) {
   const closeUrl = historyDialog.dataset.closeUrl;
@@ -38,7 +77,7 @@ if (salaryEditor) {
     salaryInput.select();
   }
 
-  function closeSalaryEditor() {
+  closeSalaryEditor = function () {
     salaryInput.value = salaryEditor.dataset.currentSalary;
     salaryInput.setAttribute("aria-invalid", "false");
     salaryInput.removeAttribute("aria-describedby");
@@ -46,14 +85,53 @@ if (salaryEditor) {
     salaryForm.hidden = true;
     salaryDisplay.hidden = false;
     salaryDisplay.focus();
-  }
+  };
 
-  salaryDisplay.addEventListener("click", openSalaryEditor);
+  salaryDisplay.addEventListener("click", () => {
+    closeOtherInteractions("salary");
+    openSalaryEditor();
+  });
   salaryCancel.addEventListener("click", closeSalaryEditor);
   salaryForm.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       event.preventDefault();
       closeSalaryEditor();
+    }
+  });
+}
+
+if (usernameEditor) {
+  const usernameDisplay = usernameEditor.querySelector(".username-display");
+  const usernameForm = usernameEditor.querySelector(".username-form");
+  const usernameInput = usernameEditor.querySelector(".username-input");
+  const usernameCancel = usernameEditor.querySelector("[data-username-cancel]");
+
+  function openUsernameEditor() {
+    usernameDisplay.hidden = true;
+    usernameForm.hidden = false;
+    usernameInput.focus();
+    usernameInput.select();
+  }
+
+  closeUsernameEditor = function () {
+    usernameInput.value = usernameEditor.dataset.currentUsername;
+    usernameInput.setAttribute("aria-invalid", "false");
+    usernameInput.removeAttribute("aria-describedby");
+    usernameEditor.querySelector(".username-error")?.remove();
+    usernameForm.hidden = true;
+    usernameDisplay.hidden = false;
+    usernameDisplay.focus();
+  };
+
+  usernameDisplay.addEventListener("click", () => {
+    closeOtherInteractions("username");
+    openUsernameEditor();
+  });
+  usernameCancel.addEventListener("click", closeUsernameEditor);
+  usernameForm.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeUsernameEditor();
     }
   });
 }
@@ -90,6 +168,7 @@ for (const menu of menus) {
   const items = [...popup.querySelectorAll('[role="menuitem"]')];
 
   trigger.addEventListener("click", () => {
+    closeOtherInteractions(menu);
     if (popup.hidden) {
       openMenu(menu);
     } else {
@@ -126,6 +205,117 @@ for (const menu of menus) {
     deleteDialogError.hidden = true;
     closeMenu(menu);
     deleteDialog.showModal();
+  });
+}
+
+for (const details of document.querySelectorAll(".adjustment-control")) {
+  details.querySelector("summary").addEventListener("click", () => {
+    if (!details.open) {
+      closeOtherInteractions(details);
+    }
+  });
+}
+
+const envelopeGrid = document.querySelector("[data-envelope-grid]");
+let draggedEnvelope = null;
+let dropPlaceholder = null;
+let originalEnvelopeOrder = [];
+let reorderSubmitted = false;
+
+if (envelopeGrid) {
+  const envelopeCards = () => [...envelopeGrid.querySelectorAll("[data-envelope-id]")];
+  const insertBeforeCreationTile = (card) => {
+    const creationTile = envelopeGrid.querySelector(".creation-device");
+    if (creationTile) {
+      creationTile.before(card);
+    } else {
+      envelopeGrid.append(card);
+    }
+  };
+
+  envelopeGrid.addEventListener("dragstart", (event) => {
+    const card = event.target.closest("[data-envelope-id]");
+    if (!card || event.target.closest("button, a, input, summary, form")) {
+      event.preventDefault();
+      return;
+    }
+    draggedEnvelope = card;
+    originalEnvelopeOrder = envelopeCards().map((item) => item.dataset.envelopeId);
+    reorderSubmitted = false;
+    dropPlaceholder = document.createElement("div");
+    dropPlaceholder.className = "envelope-drop-placeholder";
+    dropPlaceholder.setAttribute("aria-hidden", "true");
+    card.before(dropPlaceholder);
+    card.classList.add("is-dragging");
+    card.style.display = "none";
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", card.dataset.envelopeId);
+  });
+
+  envelopeGrid.addEventListener("dragover", (event) => {
+    if (!draggedEnvelope || !dropPlaceholder) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const cards = envelopeCards().filter((card) => card !== draggedEnvelope);
+    const target = cards.find((card) => {
+      const rect = card.getBoundingClientRect();
+      return event.clientY < rect.top + rect.height / 2
+        || (event.clientY < rect.bottom && event.clientX < rect.left + rect.width / 2);
+    });
+    if (target) {
+      target.before(dropPlaceholder);
+    } else {
+      insertBeforeCreationTile(dropPlaceholder);
+    }
+  });
+
+  envelopeGrid.addEventListener("drop", async (event) => {
+    if (!draggedEnvelope || !dropPlaceholder) {
+      return;
+    }
+    event.preventDefault();
+    dropPlaceholder.before(draggedEnvelope);
+    dropPlaceholder.remove();
+    draggedEnvelope.style.display = "";
+    draggedEnvelope.classList.remove("is-dragging");
+    reorderSubmitted = true;
+    const envelopeIds = envelopeCards().map((card) => Number(card.dataset.envelopeId));
+    try {
+      const response = await fetch(envelopeGrid.dataset.orderUrl, {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({envelope_ids: envelopeIds}),
+      });
+      if (!response.ok) {
+        throw new Error("Unable to save envelope order");
+      }
+      window.location.reload();
+    } catch {
+      for (const id of originalEnvelopeOrder) {
+        insertBeforeCreationTile(envelopeCards().find((card) => card.dataset.envelopeId === id));
+      }
+    } finally {
+      draggedEnvelope = null;
+      reorderSubmitted = false;
+    }
+  });
+
+  envelopeGrid.addEventListener("dragend", () => {
+    if (!draggedEnvelope) {
+      return;
+    }
+    draggedEnvelope.style.display = "";
+    draggedEnvelope.classList.remove("is-dragging");
+    dropPlaceholder?.remove();
+    if (!reorderSubmitted) {
+      for (const id of originalEnvelopeOrder) {
+        insertBeforeCreationTile(envelopeCards().find((card) => card.dataset.envelopeId === id));
+      }
+    }
+    draggedEnvelope = null;
+    dropPlaceholder = null;
   });
 }
 

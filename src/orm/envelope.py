@@ -171,3 +171,20 @@ class Envelope(Base):
         with database.SessionLocal() as session:
             query = select(cls).where(cls.user_id == user_id).order_by(cls.priority, cls.id)
             return list(session.scalars(query).all())
+
+    @classmethod
+    def reorder_for_user(cls, user_id: int, envelope_ids: list[int]) -> list[Envelope]:
+        with database.SessionLocal.begin() as session:
+            envelopes = list(
+                session.scalars(
+                    select(cls).where(cls.user_id == user_id).order_by(cls.priority, cls.id)
+                ).all()
+            )
+            existing_ids = {envelope.id for envelope in envelopes}
+            if set(envelope_ids) != existing_ids or len(envelope_ids) != len(existing_ids):
+                raise ValueError("Envelope order does not match this user.")
+            by_id = {envelope.id: envelope for envelope in envelopes}
+            for priority, envelope_id in enumerate(envelope_ids, start=1):
+                by_id[envelope_id].priority = priority
+            session.flush()
+            return [by_id[envelope_id] for envelope_id in envelope_ids]

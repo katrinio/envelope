@@ -69,6 +69,38 @@ def test_envelope_crud(client: TestClient) -> None:
     assert list_after_delete_response.json() == []
 
 
+def test_envelopes_can_be_reordered_and_order_persists(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    first = Envelope.create(user_id=user.id, name="First", target_amount=100, priority=1)
+    second = Envelope.create(user_id=user.id, name="Second", target_amount=100, priority=2)
+    third = Envelope.create(user_id=user.id, name="Third", target_amount=100, priority=3)
+
+    response = client.patch(
+        f"/users/{user.id}/envelopes/order",
+        json={"envelope_ids": [third.id, first.id, second.id]},
+    )
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()] == [third.id, first.id, second.id]
+    assert [item.name for item in Envelope.for_user(user.id)] == ["Third", "First", "Second"]
+    page = client.get(f"/users/{user.id}/envelopes/page")
+    assert page.text.index(f'data-envelope-id="{third.id}"') < page.text.index(
+        f'data-envelope-id="{first.id}"'
+    )
+
+
+def test_reorder_rejects_unknown_or_duplicate_envelopes(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    envelope = Envelope.create(user_id=user.id, name="First", target_amount=100, priority=1)
+
+    response = client.patch(
+        f"/users/{user.id}/envelopes/order",
+        json={"envelope_ids": [envelope.id, envelope.id]},
+    )
+
+    assert response.status_code == 422
+
+
 @pytest.mark.parametrize(
     "payload",
     [
@@ -103,6 +135,65 @@ def test_envelope_page_renders(client: TestClient) -> None:
     assert response.headers["content-type"].startswith("text/html")
     assert "alice" in response.text
     assert "100,000" in response.text
+    assert response.headers["cache-control"] == "no-cache"
+
+
+def test_static_assets_use_safe_cache_policy(client: TestClient) -> None:
+    versioned = client.get("/static/envelope.css?v=build-1")
+    unversioned = client.get("/static/envelope.css")
+
+    assert versioned.status_code == 200
+    assert versioned.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert unversioned.status_code == 200
+    assert unversioned.headers["cache-control"] == "no-cache"
+
+
+def test_username_is_lowercase_and_has_inline_editor(client: TestClient) -> None:
+    user = User.create(userId=1, username="Alice Smith", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert ">alice smith</button>" in response.text
+    assert 'data-username-editor' in response.text
+    assert 'name="username"' in response.text
+    assert "data-username-cancel" in response.text
+
+
+def test_username_can_be_updated_and_cancelled(client: TestClient) -> None:
+    user = User.create(userId=1, username="Alice", salary=100_000)
+
+    update_response = client.post(
+        f"/users/{user.id}/username/edit",
+        data={"username": "Alice Cooper"},
+    )
+
+    assert update_response.status_code == 200
+    stored_user = User.get(user.id)
+    assert stored_user is not None
+    assert stored_user.username == "Alice Cooper"
+    assert ">alice cooper</button>" in update_response.text
+
+    page_response = client.get(f"/users/{user.id}/envelopes/page")
+    assert 'data-current-username="Alice Cooper"' in page_response.text
+    assert "data-username-cancel" in page_response.text
+
+
+@pytest.mark.parametrize("username", ["", "   "])
+def test_username_rejects_blank_display_name(
+    client: TestClient,
+    username: str,
+) -> None:
+    user = User.create(userId=1, username="Alice", salary=100_000)
+
+    response = client.post(
+        f"/users/{user.id}/username/edit",
+        data={"username": username},
+    )
+
+    assert response.status_code == 422
+    assert "Add a display name." in response.text
+    assert User.get(user.id).username == "Alice"  # type: ignore[union-attr]
 
 
 def test_insights_section_is_collapsed_and_contains_three_cards(client: TestClient) -> None:
@@ -766,6 +857,10 @@ def test_envelope_edit_menu_is_rendered(client: TestClient) -> None:
     assert "real money" not in script_response.text.lower()
     assert "deleteDialog.showModal()" in script_response.text
     assert 'method: "DELETE"' in script_response.text
+    assert "closeOtherInteractions" in script_response.text
+    assert 'querySelectorAll(".adjustment-control")' in script_response.text
+    assert 'long-term-savings:insights-expanded' in script_response.text
+    assert 'localStorage.setItem(insightsStorageKey, String(insightsSection.open))' in script_response.text
 
 
 def test_history_panel_lists_transactions_newest_first(client: TestClient) -> None:
@@ -1198,7 +1293,7 @@ def test_salary_is_rendered_as_inline_editor_in_header(client: TestClient) -> No
     assert 'class="salary-form"' in response.text
     assert 'value="100000"' in response.text
     assert "hidden" in response.text
-    assert "/static/envelope.js?v=envelope-delete-dialog-1" in response.text
+    assert "/static/envelope.js?v=20260827-1" in response.text
 
 
 def test_salary_can_be_updated(client: TestClient) -> None:
