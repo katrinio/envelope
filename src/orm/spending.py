@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import TYPE_CHECKING, Self
-
 from dataclasses import dataclass
+from datetime import datetime
+from typing import TYPE_CHECKING, Self, cast
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, UniqueConstraint, func, select
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
@@ -42,10 +41,10 @@ class SpendingPool(Base):
                 pool = cls(user_id=user_id, current_amount=0)
                 session.add(pool)
                 session.flush()
-            return pool
+            return cast(Self, pool)
 
     def change_amount(self, amount: int, operation: str) -> Self:
-        return change_monthly_pool(self.user_id, amount, operation, current_month_key())
+        return cast(Self, change_monthly_pool(self.user_id, amount, operation, current_month_key()))
 
 
 class MonthlySpendingCapacity(Base):

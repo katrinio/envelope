@@ -1,3 +1,10 @@
+/* ==============================
+   Совместимый entry point стилей
+   ============================== */
+
+/* ==============================
+   Базовая палитра и типографика
+   ============================== */
 :root {
   --page-background: #f1eee4;
   --device-background: #e7e2d7;
@@ -54,6 +61,9 @@ input[type="number"]::-webkit-outer-spin-button {
   border-bottom: 1px solid var(--border);
 }
 
+/* ==============================
+   Навигация между разделами
+   ============================== */
 .section-tabs {
   display: flex;
   gap: 1.25rem;
@@ -91,6 +101,9 @@ input[type="number"]::-webkit-outer-spin-button {
   min-height: 8rem;
 }
 
+/* ==============================
+   Monthly Spending
+   ============================== */
 .spending-layout {
   display: grid;
   grid-template-columns: minmax(12.5rem, 15rem) minmax(24rem, 1fr);
@@ -759,6 +772,9 @@ h1 {
   line-height: 1.25;
 }
 
+/* ==============================
+   Карточки долгосрочных накоплений
+   ============================== */
 .envelope-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, 15.5rem);
@@ -1384,6 +1400,9 @@ h1 {
   opacity: 0.55;
 }
 
+/* ==============================
+   История и модальные окна
+   ============================== */
 .history-dialog {
   position: fixed;
   z-index: 1001;

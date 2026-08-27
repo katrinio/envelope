@@ -5,7 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
     <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=20260827-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/base.css') }}?v=20260827-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/layout.css') }}?v=20260827-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/long-term.css') }}?v=20260827-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/monthly-spending.css') }}?v=20260827-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/modals.css') }}?v=20260827-1">
     <script src="{{ url_for('static', path='/envelope.js') }}?v=20260827-1" defer></script>
+    <script type="module" src="{{ url_for('static', path='/js/state.js') }}?v=20260827-1"></script>
+    <script type="module" src="{{ url_for('static', path='/js/long-term.js') }}?v=20260827-1"></script>
+    <script type="module" src="{{ url_for('static', path='/js/monthly-spending.js') }}?v=20260827-1"></script>
+    <script type="module" src="{{ url_for('static', path='/js/modals.js') }}?v=20260827-1"></script>
   </head>
   <body>
     {% if history_envelope_id is not none %}

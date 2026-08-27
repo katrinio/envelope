@@ -18,11 +18,11 @@ from src.envelope.service import (
 from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope, EnvelopeKind
 from src.orm.spending import (
+    SIGNIFICANT_SPENDING_THRESHOLD,
     ActualSpending,
     PlannedSpending,
     RoutineSpending,
     RoutineSpendingSelection,
-    SIGNIFICANT_SPENDING_THRESHOLD,
     SpendingPool,
     monthly_money_state,
     spend_planned_item,

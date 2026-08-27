@@ -11,10 +11,10 @@ from src.orm.spending import (
 from src.orm.user import User
 
 __all__ = [
+    "ActualSpending",
     "Contribution",
     "Envelope",
     "EnvelopeKind",
-    "ActualSpending",
     "MonthlySpendingCapacity",
     "PlannedSpending",
     "RoutineSpending",

@@ -1,3 +1,6 @@
+// ==========================================
+// Общие интерактивные состояния и редакторы
+// ==========================================
 const menus = [...document.querySelectorAll(".device-menu")];
 const salaryEditor = document.querySelector("[data-salary-editor]");
 const usernameEditor = document.querySelector("[data-username-editor]");
@@ -16,6 +19,9 @@ const sectionTabs = [...document.querySelectorAll("[data-section-tab]")];
 const sectionContents = [...document.querySelectorAll("[data-section-content]")];
 let pendingDeleteButton = null;
 
+// ==========================================
+// Персистентные настройки интерфейса
+// ==========================================
 function persistDetailsState(details, storageKey) {
   try {
     details.open = window.localStorage.getItem(storageKey) === "true";

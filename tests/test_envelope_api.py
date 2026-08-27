@@ -13,13 +13,13 @@ from src.app import app
 from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope
 from src.orm.spending import (
+    SIGNIFICANT_SPENDING_THRESHOLD,
     ActualSpending,
     MonthlySpendingCapacity,
     PlannedSpending,
     RoutineSpending,
     RoutineSpendingSelection,
     SpendingPool,
-    SIGNIFICANT_SPENDING_THRESHOLD,
     monthly_money_state,
 )
 from src.orm.user import User
@@ -242,7 +242,7 @@ def test_routine_spending_can_be_created_edited_selected_and_deleted(client: Tes
     selection = RoutineSpendingSelection.for_month([routine.id], date.today().strftime("%Y-%m"))[routine.id]
     assert selection.quantity == 2
     page_response = client.get(f"/users/{user.id}/envelopes/page")
-    assert "2 × 3,000 = 6,000 RSD" in page_response.text
+    assert "2 × 3,000 = 6,000 RSD" in page_response.text  # noqa: RUF001
 
     delete_response = client.post(f"/users/{user.id}/spending/routine/{routine.id}/delete")
     assert delete_response.status_code == 200
@@ -552,6 +552,22 @@ def test_static_assets_use_safe_cache_policy(client: TestClient) -> None:
     assert versioned.headers["cache-control"] == "public, max-age=31536000, immutable"
     assert unversioned.status_code == 200
     assert unversioned.headers["cache-control"] == "no-cache"
+
+
+def test_refactored_static_modules_are_reachable(client: TestClient) -> None:
+    paths = [
+        "/static/css/base.css",
+        "/static/css/layout.css",
+        "/static/css/long-term.css",
+        "/static/css/monthly-spending.css",
+        "/static/css/modals.css",
+        "/static/js/state.js",
+        "/static/js/long-term.js",
+        "/static/js/monthly-spending.js",
+        "/static/js/modals.js",
+    ]
+
+    assert all(client.get(path).status_code == 200 for path in paths)
 
 
 def test_username_is_lowercase_and_has_inline_editor(client: TestClient) -> None:
