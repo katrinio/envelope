@@ -135,6 +135,17 @@ def test_envelope_page_renders(client: TestClient) -> None:
     assert response.headers["content-type"].startswith("text/html")
     assert "alice" in response.text
     assert "100,000" in response.text
+    assert response.headers["cache-control"] == "no-cache"
+
+
+def test_static_assets_use_safe_cache_policy(client: TestClient) -> None:
+    versioned = client.get("/static/envelope.css?v=build-1")
+    unversioned = client.get("/static/envelope.css")
+
+    assert versioned.status_code == 200
+    assert versioned.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert unversioned.status_code == 200
+    assert unversioned.headers["cache-control"] == "no-cache"
 
 
 def test_username_is_lowercase_and_has_inline_editor(client: TestClient) -> None:
@@ -1282,7 +1293,7 @@ def test_salary_is_rendered_as_inline_editor_in_header(client: TestClient) -> No
     assert 'class="salary-form"' in response.text
     assert 'value="100000"' in response.text
     assert "hidden" in response.text
-    assert "/static/envelope.js?v=envelope-delete-dialog-1" in response.text
+    assert "/static/envelope.js?v=20260827-1" in response.text
 
 
 def test_salary_can_be_updated(client: TestClient) -> None:
