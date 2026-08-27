@@ -816,6 +816,8 @@ def test_envelope_edit_menu_is_rendered(client: TestClient) -> None:
     assert 'method: "DELETE"' in script_response.text
     assert "closeOtherInteractions" in script_response.text
     assert 'querySelectorAll(".adjustment-control")' in script_response.text
+    assert 'long-term-savings:insights-expanded' in script_response.text
+    assert 'localStorage.setItem(insightsStorageKey, String(insightsSection.open))' in script_response.text
 
 
 def test_history_panel_lists_transactions_newest_first(client: TestClient) -> None:

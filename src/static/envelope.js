@@ -7,7 +7,24 @@ const deleteDialogConfirm = deleteDialog.querySelector("[data-delete-confirm]");
 const deleteDialogError = deleteDialog.querySelector(".delete-dialog-error");
 const historyDialog = document.querySelector("[data-history-dialog]");
 const historyBackdrop = document.querySelector("[data-history-backdrop]");
+const insightsSection = document.querySelector("[data-insights-section]");
+const insightsStorageKey = "long-term-savings:insights-expanded";
 let pendingDeleteButton = null;
+
+if (insightsSection) {
+  try {
+    insightsSection.open = window.localStorage.getItem(insightsStorageKey) === "true";
+  } catch {
+    // Local UI preferences are optional when storage is unavailable.
+  }
+  insightsSection.addEventListener("toggle", () => {
+    try {
+      window.localStorage.setItem(insightsStorageKey, String(insightsSection.open));
+    } catch {
+      // Ignore restricted or unavailable local storage.
+    }
+  });
+}
 let closeSalaryEditor = null;
 let closeUsernameEditor = null;
 
