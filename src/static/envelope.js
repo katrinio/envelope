@@ -8,6 +8,27 @@ const deleteDialogError = deleteDialog.querySelector(".delete-dialog-error");
 const historyDialog = document.querySelector("[data-history-dialog]");
 const historyBackdrop = document.querySelector("[data-history-backdrop]");
 let pendingDeleteButton = null;
+let closeSalaryEditor = null;
+let closeUsernameEditor = null;
+
+function closeOtherInteractions(except = null) {
+  if (closeSalaryEditor && except !== "salary") {
+    closeSalaryEditor();
+  }
+  if (closeUsernameEditor && except !== "username") {
+    closeUsernameEditor();
+  }
+  for (const details of document.querySelectorAll(".adjustment-control[open]")) {
+    if (details !== except) {
+      details.removeAttribute("open");
+    }
+  }
+  for (const menu of menus) {
+    if (menu !== except) {
+      closeMenu(menu);
+    }
+  }
+}
 
 if (historyDialog) {
   const closeUrl = historyDialog.dataset.closeUrl;
@@ -39,7 +60,7 @@ if (salaryEditor) {
     salaryInput.select();
   }
 
-  function closeSalaryEditor() {
+  closeSalaryEditor = function () {
     salaryInput.value = salaryEditor.dataset.currentSalary;
     salaryInput.setAttribute("aria-invalid", "false");
     salaryInput.removeAttribute("aria-describedby");
@@ -47,9 +68,12 @@ if (salaryEditor) {
     salaryForm.hidden = true;
     salaryDisplay.hidden = false;
     salaryDisplay.focus();
-  }
+  };
 
-  salaryDisplay.addEventListener("click", openSalaryEditor);
+  salaryDisplay.addEventListener("click", () => {
+    closeOtherInteractions("salary");
+    openSalaryEditor();
+  });
   salaryCancel.addEventListener("click", closeSalaryEditor);
   salaryForm.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -72,7 +96,7 @@ if (usernameEditor) {
     usernameInput.select();
   }
 
-  function closeUsernameEditor() {
+  closeUsernameEditor = function () {
     usernameInput.value = usernameEditor.dataset.currentUsername;
     usernameInput.setAttribute("aria-invalid", "false");
     usernameInput.removeAttribute("aria-describedby");
@@ -80,9 +104,12 @@ if (usernameEditor) {
     usernameForm.hidden = true;
     usernameDisplay.hidden = false;
     usernameDisplay.focus();
-  }
+  };
 
-  usernameDisplay.addEventListener("click", openUsernameEditor);
+  usernameDisplay.addEventListener("click", () => {
+    closeOtherInteractions("username");
+    openUsernameEditor();
+  });
   usernameCancel.addEventListener("click", closeUsernameEditor);
   usernameForm.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -124,6 +151,7 @@ for (const menu of menus) {
   const items = [...popup.querySelectorAll('[role="menuitem"]')];
 
   trigger.addEventListener("click", () => {
+    closeOtherInteractions(menu);
     if (popup.hidden) {
       openMenu(menu);
     } else {
@@ -160,6 +188,14 @@ for (const menu of menus) {
     deleteDialogError.hidden = true;
     closeMenu(menu);
     deleteDialog.showModal();
+  });
+}
+
+for (const details of document.querySelectorAll(".adjustment-control")) {
+  details.querySelector("summary").addEventListener("click", () => {
+    if (!details.open) {
+      closeOtherInteractions(details);
+    }
   });
 }
 

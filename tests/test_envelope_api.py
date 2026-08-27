@@ -814,6 +814,8 @@ def test_envelope_edit_menu_is_rendered(client: TestClient) -> None:
     assert "real money" not in script_response.text.lower()
     assert "deleteDialog.showModal()" in script_response.text
     assert 'method: "DELETE"' in script_response.text
+    assert "closeOtherInteractions" in script_response.text
+    assert 'querySelectorAll(".adjustment-control")' in script_response.text
 
 
 def test_history_panel_lists_transactions_newest_first(client: TestClient) -> None:
