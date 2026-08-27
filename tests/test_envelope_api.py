@@ -12,7 +12,13 @@ from src import database
 from src.app import app
 from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope
-from src.orm.spending import PlannedSpending, SpendingPool
+from src.orm.spending import (
+    ActualSpending,
+    PlannedSpending,
+    RoutineSpending,
+    RoutineSpendingSelection,
+    SpendingPool,
+)
 from src.orm.user import User
 
 
@@ -172,6 +178,166 @@ def test_monthly_spending_pool_and_planned_items_are_independent(client: TestCli
     assert len(items) == 1
     assert items[0].name == "Gloves"
     assert items[0].amount == 8_000
+
+
+def test_monthly_spending_uses_rsd_layout_and_clean_sections(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(50_000, "increment")
+    RoutineSpending.create(user_id=user.id, name="Boxing", default_amount=12_000)
+    PlannedSpending.create(user_id=user.id, name="Chair", amount=35_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert "AVAILABLE" in response.text
+    assert "ROUTINE" in response.text
+    assert "PLANNED" in response.text
+    assert "50,000 RSD" in response.text
+    assert "12,000 RSD" in response.text
+    assert "35,000 RSD" in response.text
+    spending_markup = response.text.split('data-section-content="spending"', maxsplit=1)[1]
+    assert "<details" not in spending_markup
+    assert 'class="spending-layout"' in response.text
+    assert 'class="spending-pool-fill"' in response.text
+    assert 'data-editor-target="routine-add"' in response.text
+    assert 'data-editor-target="planned-add"' in response.text
+
+
+def test_routine_spending_can_be_created_edited_selected_and_deleted(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    create_response = client.post(
+        f"/users/{user.id}/spending/routine/create",
+        data={"name": "Boxing", "amount": "12000"},
+    )
+    assert create_response.status_code == 200
+    routine = RoutineSpending.for_user(user.id)[0]
+    assert routine.name == "Boxing"
+    assert routine.default_amount == 12_000
+
+    edit_response = client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/edit",
+        data={"name": "Manicure", "amount": "3000"},
+    )
+    assert edit_response.status_code == 200
+    routine = RoutineSpending.get(routine.id)
+    assert routine is not None
+    assert routine.name == "Manicure"
+    assert routine.default_amount == 3_000
+
+    select_response = client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "2"},
+    )
+    assert select_response.status_code == 200
+    selection = RoutineSpendingSelection.for_month([routine.id], date.today().strftime("%Y-%m"))[routine.id]
+    assert selection.quantity == 2
+    page_response = client.get(f"/users/{user.id}/envelopes/page")
+    assert "2 × 3,000 = 6,000 RSD" in page_response.text
+
+    delete_response = client.post(f"/users/{user.id}/spending/routine/{routine.id}/delete")
+    assert delete_response.status_code == 200
+    assert RoutineSpending.get(routine.id) is None
+
+
+def test_routine_and_planned_do_not_deduct_available(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(50_000, "increment")
+
+    client.post(
+        f"/users/{user.id}/spending/routine/create",
+        data={"name": "Boxing", "amount": "12000"},
+    )
+    routine = RoutineSpending.for_user(user.id)[0]
+    client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "1"},
+    )
+    client.post(
+        f"/users/{user.id}/spending/planned/create",
+        data={"name": "Chair", "amount": "35000"},
+    )
+
+    assert SpendingPool.for_user(user.id).current_amount == 50_000
+
+
+def test_spending_planned_routine_deducts_available_records_history_and_resets_selection(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(21_000, "increment")
+    routine = RoutineSpending.create(user_id=user.id, name="Box", default_amount=9_000)
+    client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "2"},
+    )
+
+    response = client.post(f"/users/{user.id}/spending/routine/{routine.id}/spend")
+
+    assert response.status_code == 200
+    assert SpendingPool.for_user(user.id).current_amount == 3_000
+    assert RoutineSpending.get(routine.id) is not None
+    assert RoutineSpendingSelection.for_month([routine.id], date.today().strftime("%Y-%m")) == {}
+    records = ActualSpending.for_user(user.id)
+    assert len(records) == 1
+    assert records[0].expense_name == "Box"
+    assert records[0].amount == 18_000
+    assert records[0].source_type == "routine"
+    assert records[0].routine_id == routine.id
+    assert records[0].planned_spending_id is None
+
+
+def test_spending_planned_item_deducts_available_records_history_and_removes_item(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(50_000, "increment")
+    item = PlannedSpending.create(user_id=user.id, name="Chair", amount=35_000)
+
+    response = client.post(f"/users/{user.id}/spending/{item.id}/spend")
+
+    assert response.status_code == 200
+    assert SpendingPool.for_user(user.id).current_amount == 15_000
+    assert PlannedSpending.get(item.id) is None
+    records = ActualSpending.for_user(user.id)
+    assert len(records) == 1
+    assert records[0].expense_name == "Chair"
+    assert records[0].amount == 35_000
+    assert records[0].source_type == "planned"
+    assert records[0].planned_spending_id == item.id
+
+
+def test_spend_rejects_insufficient_available_without_changing_state(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(10_000, "increment")
+    item = PlannedSpending.create(user_id=user.id, name="Chair", amount=35_000)
+
+    response = client.post(f"/users/{user.id}/spending/{item.id}/spend")
+
+    assert response.status_code == 422
+    assert "Not enough available money." in response.text
+    assert SpendingPool.for_user(user.id).current_amount == 10_000
+    assert PlannedSpending.get(item.id) is not None
+    assert ActualSpending.for_user(user.id) == []
+
+
+def test_spend_actions_render_only_for_planned_states(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    inactive = RoutineSpending.create(user_id=user.id, name="Boxing", default_amount=12_000)
+    active = RoutineSpending.create(user_id=user.id, name="Manicure", default_amount=3_000)
+    PlannedSpending.create(user_id=user.id, name="Chair", amount=35_000)
+    client.post(
+        f"/users/{user.id}/spending/routine/{active.id}/selection",
+        data={"selected": "1", "quantity": "2"},
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert f'routine-spend-{active.id}' in response.text
+    assert f'routine-spend-{inactive.id}' not in response.text
+    assert "planned-spend-" in response.text
+    assert "Deduct from Available?" in response.text
 
 
 def test_planned_spending_can_be_edited_and_deleted(client: TestClient) -> None:

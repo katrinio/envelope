@@ -66,6 +66,7 @@ if (insightsSection) {
 }
 let closeSalaryEditor = null;
 let closeUsernameEditor = null;
+let closeSpendingEditor = null;
 
 function closeOtherInteractions(except = null) {
   if (closeSalaryEditor && except !== "salary") {
@@ -78,6 +79,9 @@ function closeOtherInteractions(except = null) {
     if (details !== except) {
       details.removeAttribute("open");
     }
+  }
+  if (closeSpendingEditor && except !== "spending-editor") {
+    closeSpendingEditor();
   }
   for (const menu of menus) {
     if (menu !== except) {
@@ -186,6 +190,7 @@ function closeMenu(menu, restoreFocus = false) {
 }
 
 function openMenu(menu, focusFirstItem = false) {
+  closeOtherInteractions(menu);
   for (const otherMenu of menus) {
     if (otherMenu !== menu) {
       closeMenu(otherMenu);
@@ -207,7 +212,6 @@ for (const menu of menus) {
   const items = [...popup.querySelectorAll('[role="menuitem"]')];
 
   trigger.addEventListener("click", () => {
-    closeOtherInteractions(menu);
     if (popup.hidden) {
       openMenu(menu);
     } else {
@@ -239,12 +243,14 @@ for (const menu of menus) {
   });
 
   const deleteButton = popup.querySelector("[data-delete-envelope]");
-  deleteButton.addEventListener("click", () => {
-    pendingDeleteButton = deleteButton;
-    deleteDialogError.hidden = true;
-    closeMenu(menu);
-    deleteDialog.showModal();
-  });
+  if (deleteButton) {
+    deleteButton.addEventListener("click", () => {
+      pendingDeleteButton = deleteButton;
+      deleteDialogError.hidden = true;
+      closeMenu(menu);
+      deleteDialog.showModal();
+    });
+  }
 }
 
 for (const details of document.querySelectorAll(".adjustment-control")) {
@@ -255,11 +261,67 @@ for (const details of document.querySelectorAll(".adjustment-control")) {
   });
 }
 
-for (const button of document.querySelectorAll("[data-planned-delete]")) {
-  button.addEventListener("click", (event) => {
-    if (!window.confirm("Permanently delete this planned expense? This action cannot be undone.")) {
-      event.preventDefault();
+const spendingEditors = [...document.querySelectorAll("[data-spending-editor]")];
+
+function openSpendingEditor(editor, activeTrigger = null) {
+  closeOtherInteractions("spending-editor");
+  closeSpendingEditor = () => {
+    for (const openEditor of spendingEditors) {
+      openEditor.hidden = true;
     }
+    for (const trigger of document.querySelectorAll("[data-editor-trigger][aria-expanded]")) {
+      trigger.setAttribute("aria-expanded", "false");
+    }
+    closeSpendingEditor = null;
+  };
+  editor.hidden = false;
+  activeTrigger?.setAttribute("aria-expanded", "true");
+  const firstInput = editor.querySelector("input");
+  firstInput?.focus();
+  firstInput?.select();
+}
+
+for (const trigger of document.querySelectorAll("[data-editor-trigger]")) {
+  trigger.addEventListener("click", (event) => {
+    const targetId = trigger.dataset.editorTarget;
+    const editor = targetId
+      ? document.getElementById(targetId)
+      : trigger.closest("[data-spending-editor]")?.querySelector("form");
+    if (!editor) {
+      return;
+    }
+    event.preventDefault();
+    if (!editor.hidden) {
+      closeSpendingEditor?.();
+      return;
+    }
+    openSpendingEditor(editor, trigger);
+  });
+}
+
+for (const button of document.querySelectorAll("[data-editor-cancel]")) {
+  button.addEventListener("click", () => {
+    closeSpendingEditor?.();
+  });
+}
+
+for (const editor of spendingEditors) {
+  editor.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSpendingEditor?.();
+    }
+  });
+}
+
+for (const input of document.querySelectorAll("[data-routine-quantity]")) {
+  input.addEventListener("change", () => {
+    const form = input.closest("form");
+    const selectedMarker = form?.querySelector("[data-routine-selected-marker]");
+    if (selectedMarker) {
+      selectedMarker.disabled = false;
+    }
+    form?.requestSubmit();
   });
 }
 

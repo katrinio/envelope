@@ -9,7 +9,7 @@ from src.database import Base
 
 if TYPE_CHECKING:
     from src.orm.envelope import Envelope
-    from src.orm.spending import PlannedSpending, SpendingPool
+    from src.orm.spending import PlannedSpending, RoutineSpending, SpendingPool
 
 
 class User(Base):
@@ -27,6 +27,9 @@ class User(Base):
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
     planned_spending: Mapped[list[PlannedSpending]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    routine_spending: Mapped[list[RoutineSpending]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 

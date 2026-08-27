@@ -613,51 +613,168 @@
       <section class="section-content monthly-spending" data-section-content="spending" hidden>
         <div class="spending-layout">
           <section class="spending-pool-device">
-            <p class="spending-label">Available</p>
-            <div class="spending-pool-scale" aria-hidden="true">
-              <div class="spending-pool-fill" style="height: {{ '100%' if spending_pool.current_amount else '0%' }}"></div>
+            <p class="spending-label">AVAILABLE</p>
+            <div class="spending-pool-display">
+              <div class="spending-pool-scale" aria-hidden="true">
+                <div class="spending-pool-fill" style="height: {{ '100%' if spending_pool.current_amount else '0%' }}"></div>
+              </div>
+              <div class="spending-pool-copy">
+                <p class="spending-pool-amount">{{ "{:,}".format(spending_pool.current_amount) }} RSD</p>
+                <p class="spending-secondary">available</p>
+              </div>
             </div>
-            <p class="spending-pool-amount">€{{ "{:,}".format(spending_pool.current_amount) }}</p>
-            <p class="spending-secondary">available</p>
             <div class="spending-pool-controls">
               {% for operation, symbol in [('decrement', '−'), ('increment', '+')] %}
-                <details class="spending-adjustment">
-                  <summary aria-label="{{ 'Decrease' if operation == 'decrement' else 'Increase' }} available amount">{{ symbol }}</summary>
-                  <form action="{{ url_for('change_spending_amount', user_id=user.id) }}" method="post">
-                    <input name="amount" type="number" min="1" step="1" required>
-                    <button name="operation" value="{{ operation }}" type="submit">OK</button>
+                <div class="spending-adjustment" data-spending-editor>
+                  <button class="spending-control-trigger" type="button" aria-expanded="false" aria-label="{{ 'Decrease' if operation == 'decrement' else 'Increase' }} available amount" data-editor-trigger>{{ symbol }}</button>
+                  <form class="spending-popover-form" action="{{ url_for('change_spending_amount', user_id=user.id) }}" method="post" {% if not spending_form or spending_form.item_kind != 'available' %}hidden{% endif %}>
+                    <label>
+                      <span>Amount</span>
+                      <input name="amount" type="number" min="1" step="1" inputmode="numeric" required>
+                    </label>
+                    <div class="spending-form-actions">
+                      <button type="button" data-editor-cancel>Cancel</button>
+                      <button name="operation" value="{{ operation }}" type="submit">Save</button>
+                    </div>
                   </form>
-                </details>
+                </div>
               {% endfor %}
             </div>
-            {% if spending_form and spending_form.error %}
+            {% if spending_form and spending_form.item_kind == 'available' and spending_form.error %}
               <p class="spending-error">{{ spending_form.error }}</p>
             {% endif %}
           </section>
-          <section class="planned-spending">
-            <h2>Planned spending</h2>
-            <div class="planned-list">
-              {% for item in planned_spending %}
-                <details class="planned-item">
-                  <summary><span>{{ item.name }}</span><strong>€{{ "{:,}".format(item.amount) }}</strong></summary>
-                  <form class="planned-edit-form" action="{{ url_for('edit_planned_spending', user_id=user.id, item_id=item.id) }}" method="post">
-                    <input name="name" value="{{ item.name }}" required>
-                    <input name="amount" type="number" min="1" value="{{ item.amount }}" required>
+          <div class="spending-sections">
+            <section class="spending-list-section">
+              <div class="spending-section-header">
+                <h2>ROUTINE</h2>
+                <button class="spending-add-trigger" type="button" data-editor-trigger data-editor-target="routine-add">+ Add</button>
+              </div>
+              <form class="spending-inline-form" data-spending-editor id="routine-add" action="{{ url_for('create_routine_spending', user_id=user.id) }}" method="post" {% if not spending_form or spending_form.item_kind != 'routine' or spending_form.item_id %}hidden{% endif %}>
+                <input name="name" placeholder="Name" value="{{ spending_form.name if spending_form and spending_form.item_kind == 'routine' and not spending_form.item_id else '' }}" required>
+                <input name="amount" type="number" min="1" inputmode="numeric" placeholder="Amount" value="{{ spending_form.amount if spending_form and spending_form.item_kind == 'routine' and not spending_form.item_id else '' }}" required>
+                {% if spending_form and spending_form.item_kind == 'routine' and not spending_form.item_id and spending_form.error %}
+                  <p class="spending-error">{{ spending_form.error }}</p>
+                {% endif %}
+                <button type="button" data-editor-cancel>Cancel</button>
+                <button type="submit">Save</button>
+              </form>
+              <div class="spending-list">
+                {% for item in routine_items %}
+                  <div class="spending-row{% if item.is_selected %} is-selected{% endif %}">
+                    <form class="routine-selection-form" action="{{ url_for('update_routine_spending_selection', user_id=user.id, item_id=item.routine.id) }}" method="post">
+                      <button class="routine-toggle" type="submit" name="selected" value="{{ '' if item.is_selected else '1' }}" aria-pressed="{{ 'true' if item.is_selected else 'false' }}" aria-label="{{ 'Exclude' if item.is_selected else 'Include' }} {{ item.routine.name }} this month"></button>
+                      {% if item.is_selected %}
+                        <input type="hidden" name="selected" value="1" data-routine-selected-marker disabled>
+                        <input class="routine-quantity" name="quantity" type="number" min="1" step="1" inputmode="numeric" value="{{ item.quantity }}" aria-label="{{ item.routine.name }} quantity" data-routine-quantity>
+                      {% else %}
+                        <input name="quantity" type="hidden" value="1">
+                      {% endif %}
+                    </form>
+                    <div class="spending-row-copy">
+                      <span>{{ item.routine.name }}</span>
+                      {% if item.is_selected and item.quantity > 1 %}
+                        <small>{{ item.quantity }} × {{ "{:,}".format(item.routine.default_amount) }} = {{ "{:,}".format(item.monthly_amount) }} RSD</small>
+                      {% endif %}
+                    </div>
+                    <strong>{{ "{:,}".format(item.monthly_amount if item.is_selected else item.routine.default_amount) }} RSD</strong>
+                    <div class="device-menu spending-row-menu">
+                      <button class="device-menu-trigger" type="button" aria-label="Routine actions" aria-haspopup="menu" aria-expanded="false" aria-controls="routine-menu-{{ item.routine.id }}">
+                        <span aria-hidden="true">•••</span>
+                      </button>
+                      <div class="device-menu-popup" id="routine-menu-{{ item.routine.id }}" role="menu" hidden>
+                        {% if item.is_selected %}
+                          <button type="button" role="menuitem" data-editor-trigger data-editor-target="routine-spend-{{ item.routine.id }}">Spend</button>
+                        {% endif %}
+                        <button type="button" role="menuitem" data-editor-trigger data-editor-target="routine-edit-{{ item.routine.id }}">Edit</button>
+                        <button type="submit" role="menuitem" form="routine-delete-{{ item.routine.id }}">Delete</button>
+                      </div>
+                    </div>
+                    <form id="routine-delete-{{ item.routine.id }}" action="{{ url_for('delete_routine_spending', user_id=user.id, item_id=item.routine.id) }}" method="post"></form>
+                  </div>
+                  {% if item.is_selected %}
+                    <form class="spending-confirm-form" data-spending-editor id="routine-spend-{{ item.routine.id }}" action="{{ url_for('spend_routine_spending', user_id=user.id, item_id=item.routine.id) }}" method="post" {% if not spending_form or spending_form.item_kind != 'routine-spend' or spending_form.item_id != item.routine.id %}hidden{% endif %}>
+                      <p>{{ item.routine.name }}</p>
+                      <strong>{{ "{:,}".format(item.monthly_amount) }} RSD</strong>
+                      <span>Deduct from Available?</span>
+                      {% if spending_form and spending_form.item_kind == 'routine-spend' and spending_form.item_id == item.routine.id and spending_form.error %}
+                        <p class="spending-error">{{ spending_form.error }}</p>
+                      {% endif %}
+                      <div class="spending-form-actions">
+                        <button type="button" data-editor-cancel>Cancel</button>
+                        <button type="submit">Spend</button>
+                      </div>
+                    </form>
+                  {% endif %}
+                  <form class="spending-inline-form" data-spending-editor id="routine-edit-{{ item.routine.id }}" action="{{ url_for('edit_routine_spending', user_id=user.id, item_id=item.routine.id) }}" method="post" {% if not spending_form or spending_form.item_kind != 'routine' or spending_form.item_id != item.routine.id %}hidden{% endif %}>
+                    <input name="name" value="{{ spending_form.name if spending_form and spending_form.item_kind == 'routine' and spending_form.item_id == item.routine.id else item.routine.name }}" required>
+                    <input name="amount" type="number" min="1" inputmode="numeric" value="{{ spending_form.amount if spending_form and spending_form.item_kind == 'routine' and spending_form.item_id == item.routine.id else item.routine.default_amount }}" required>
+                    {% if spending_form and spending_form.item_kind == 'routine' and spending_form.item_id == item.routine.id and spending_form.error %}
+                      <p class="spending-error">{{ spending_form.error }}</p>
+                    {% endif %}
+                    <button type="button" data-editor-cancel>Cancel</button>
                     <button type="submit">Save</button>
-                    <button data-planned-delete formaction="{{ url_for('delete_planned_spending', user_id=user.id, item_id=item.id) }}" formmethod="post" type="submit">Delete</button>
                   </form>
-                </details>
-              {% endfor %}
-              <details class="planned-add">
-                <summary>+ Add</summary>
-                <form action="{{ url_for('create_planned_spending', user_id=user.id) }}" method="post">
-                  <input name="name" placeholder="Name" value="{{ spending_form.name if spending_form and not spending_form.item_id else '' }}" required>
-                  <input name="amount" type="number" min="1" placeholder="Amount" value="{{ spending_form.amount if spending_form and not spending_form.item_id else '' }}" required>
-                  <button type="submit">Add</button>
-                </form>
-              </details>
-            </div>
-          </section>
+                {% endfor %}
+              </div>
+            </section>
+
+            <section class="spending-list-section">
+              <div class="spending-section-header">
+                <h2>PLANNED</h2>
+                <button class="spending-add-trigger" type="button" data-editor-trigger data-editor-target="planned-add">+ Add</button>
+              </div>
+              <form class="spending-inline-form" data-spending-editor id="planned-add" action="{{ url_for('create_planned_spending', user_id=user.id) }}" method="post" {% if not spending_form or spending_form.item_kind != 'planned' or spending_form.item_id %}hidden{% endif %}>
+                <input name="name" placeholder="Name" value="{{ spending_form.name if spending_form and spending_form.item_kind == 'planned' and not spending_form.item_id else '' }}" required>
+                <input name="amount" type="number" min="1" inputmode="numeric" placeholder="Amount" value="{{ spending_form.amount if spending_form and spending_form.item_kind == 'planned' and not spending_form.item_id else '' }}" required>
+                {% if spending_form and spending_form.item_kind == 'planned' and not spending_form.item_id and spending_form.error %}
+                  <p class="spending-error">{{ spending_form.error }}</p>
+                {% endif %}
+                <button type="button" data-editor-cancel>Cancel</button>
+                <button type="submit">Save</button>
+              </form>
+              <div class="spending-list">
+                {% for item in planned_spending %}
+                  <div class="spending-row">
+                    <div class="spending-row-copy"><span>{{ item.name }}</span></div>
+                    <strong>{{ "{:,}".format(item.amount) }} RSD</strong>
+                    <div class="device-menu spending-row-menu">
+                      <button class="device-menu-trigger" type="button" aria-label="Planned actions" aria-haspopup="menu" aria-expanded="false" aria-controls="planned-menu-{{ item.id }}">
+                        <span aria-hidden="true">•••</span>
+                      </button>
+                      <div class="device-menu-popup" id="planned-menu-{{ item.id }}" role="menu" hidden>
+                        <button type="button" role="menuitem" data-editor-trigger data-editor-target="planned-spend-{{ item.id }}">Spend</button>
+                        <button type="button" role="menuitem" data-editor-trigger data-editor-target="planned-edit-{{ item.id }}">Edit</button>
+                        <button type="submit" role="menuitem" form="planned-delete-{{ item.id }}">Delete</button>
+                      </div>
+                    </div>
+                    <form id="planned-delete-{{ item.id }}" action="{{ url_for('delete_planned_spending', user_id=user.id, item_id=item.id) }}" method="post"></form>
+                  </div>
+                  <form class="spending-confirm-form" data-spending-editor id="planned-spend-{{ item.id }}" action="{{ url_for('spend_planned_spending', user_id=user.id, item_id=item.id) }}" method="post" {% if not spending_form or spending_form.item_kind != 'planned-spend' or spending_form.item_id != item.id %}hidden{% endif %}>
+                    <p>{{ item.name }}</p>
+                    <strong>{{ "{:,}".format(item.amount) }} RSD</strong>
+                    <span>Deduct from Available?</span>
+                    {% if spending_form and spending_form.item_kind == 'planned-spend' and spending_form.item_id == item.id and spending_form.error %}
+                      <p class="spending-error">{{ spending_form.error }}</p>
+                    {% endif %}
+                    <div class="spending-form-actions">
+                      <button type="button" data-editor-cancel>Cancel</button>
+                      <button type="submit">Spend</button>
+                    </div>
+                  </form>
+                  <form class="spending-inline-form" data-spending-editor id="planned-edit-{{ item.id }}" action="{{ url_for('edit_planned_spending', user_id=user.id, item_id=item.id) }}" method="post" {% if not spending_form or spending_form.item_kind != 'planned' or spending_form.item_id != item.id %}hidden{% endif %}>
+                    <input name="name" value="{{ spending_form.name if spending_form and spending_form.item_kind == 'planned' and spending_form.item_id == item.id else item.name }}" required>
+                    <input name="amount" type="number" min="1" inputmode="numeric" value="{{ spending_form.amount if spending_form and spending_form.item_kind == 'planned' and spending_form.item_id == item.id else item.amount }}" required>
+                    {% if spending_form and spending_form.item_kind == 'planned' and spending_form.item_id == item.id and spending_form.error %}
+                      <p class="spending-error">{{ spending_form.error }}</p>
+                    {% endif %}
+                    <button type="button" data-editor-cancel>Cancel</button>
+                    <button type="submit">Save</button>
+                  </form>
+                {% endfor %}
+              </div>
+            </section>
+          </div>
         </div>
       </section>
     </main>
