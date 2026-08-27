@@ -5,7 +5,7 @@ services:
     environment:
       DATABASE_URL: sqlite:////data/envelope.db
     volumes:
-      - envelope_data:/data
+      - ./data:/data
     restart: "no"
 
   envelope:
@@ -18,7 +18,7 @@ services:
     environment:
       DATABASE_URL: sqlite:////data/envelope.db
     volumes:
-      - envelope_data:/data
+      - ./data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8000/docs >/dev/null || exit 1"]
