@@ -1,6 +1,6 @@
 from calendar import month_name
 from collections.abc import Iterator
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -19,6 +19,7 @@ from src.orm.spending import (
     RoutineSpending,
     RoutineSpendingSelection,
     SpendingPool,
+    SIGNIFICANT_SPENDING_THRESHOLD,
     monthly_money_state,
 )
 from src.orm.user import User
@@ -197,7 +198,10 @@ def test_monthly_spending_uses_rsd_layout_and_clean_sections(client: TestClient)
     assert "50,000 RSD" in response.text
     assert "12,000 RSD" in response.text
     assert "35,000 RSD" in response.text
-    spending_markup = response.text.split('data-section-content="spending"', maxsplit=1)[1]
+    spending_markup = response.text.split('class="spending-layout"', maxsplit=1)[1].split(
+        '<details class="insights-section recent-spending-section"',
+        maxsplit=1,
+    )[0]
     assert "<details" not in spending_markup
     assert 'class="spending-layout"' in response.text
     assert 'class="spending-pool-free"' in response.text
@@ -355,6 +359,101 @@ def test_spend_actions_render_only_for_planned_states(client: TestClient) -> Non
     assert f'routine-spend-{inactive.id}' not in response.text
     assert "planned-spend-" in response.text
     assert "Deduct from Available?" in response.text
+
+
+def test_recent_spending_section_is_collapsed_and_uses_local_storage(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+    script_response = client.get("/static/envelope.js")
+
+    assert response.status_code == 200
+    details_tag = response.text.split(
+        '<details class="insights-section recent-spending-section"',
+        maxsplit=1,
+    )[1].split(">", maxsplit=1)[0]
+    assert "open" not in details_tag
+    assert "recent spending" in response.text
+    assert "No significant purchases in the last 3 months." in response.text
+    assert "monthly-spending:recent-spending-expanded" in script_response.text
+    assert "persistDetailsState(recentSpendingSection, recentSpendingStorageKey)" in script_response.text
+
+
+def test_recent_spending_shows_significant_planned_purchases_only(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    now = datetime.now()
+    current_month = now.strftime("%Y-%m")
+    previous_month_date = (now.replace(day=1) - timedelta(days=1)).replace(day=5)
+    previous_month = previous_month_date.strftime("%Y-%m")
+    old_month_date = (now.replace(day=1) - timedelta(days=100)).replace(day=5)
+    old_month = old_month_date.strftime("%Y-%m")
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="New shoes",
+        amount=8_500,
+        source_type="planned",
+        month_key=current_month,
+        spent_at=now,
+    )
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="Curtains",
+        amount=12_000,
+        source_type="planned",
+        month_key=current_month,
+        spent_at=now - timedelta(days=1),
+    )
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="Cleaning",
+        amount=6_000,
+        source_type="planned",
+        month_key=previous_month,
+        spent_at=previous_month_date,
+    )
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="Small cable",
+        amount=SIGNIFICANT_SPENDING_THRESHOLD - 1,
+        source_type="planned",
+        month_key=current_month,
+        spent_at=now,
+    )
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="Routine box",
+        amount=9_000,
+        source_type="routine",
+        month_key=current_month,
+        spent_at=now,
+    )
+    ActualSpending.create(
+        user_id=user.id,
+        expense_name="Old suitcase",
+        amount=20_000,
+        source_type="planned",
+        month_key=old_month,
+        spent_at=old_month_date,
+    )
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    recent_html = response.text.split('data-recent-spending-section', maxsplit=1)[1]
+    assert "3 purchases" in recent_html
+    assert "26,500 RSD" in recent_html
+    assert "NEW SHOES" in recent_html
+    assert "CURTAINS" in recent_html
+    assert "CLEANING" in recent_html
+    assert month_name[now.month].upper() in recent_html
+    assert month_name[previous_month_date.month].upper() in recent_html
+    assert "SMALL CABLE" not in recent_html
+    assert "ROUTINE BOX" not in recent_html
+    assert "OLD SUITCASE" not in recent_html
 
 
 def test_monthly_capacity_expands_with_additions_and_spending_does_not_rescale_free(
@@ -1167,7 +1266,8 @@ def test_envelope_edit_menu_is_rendered(client: TestClient) -> None:
     assert "closeOtherInteractions" in script_response.text
     assert 'querySelectorAll(".adjustment-control")' in script_response.text
     assert 'long-term-savings:insights-expanded' in script_response.text
-    assert 'localStorage.setItem(insightsStorageKey, String(insightsSection.open))' in script_response.text
+    assert "persistDetailsState(insightsSection, insightsStorageKey)" in script_response.text
+    assert "window.localStorage.setItem(storageKey, String(details.open))" in script_response.text
 
 
 def test_history_panel_lists_transactions_newest_first(client: TestClient) -> None:

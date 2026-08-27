@@ -781,6 +781,37 @@
             </section>
           </div>
         </div>
+
+        <details class="insights-section recent-spending-section" data-recent-spending-section>
+          <summary class="insights-summary">
+            <h2>recent spending</h2>
+            <span class="insights-toggle" aria-hidden="true"></span>
+          </summary>
+          <div class="recent-spending-content">
+            {% if recent_spending.purchases_count %}
+              <p class="recent-spending-total">
+                {{ recent_spending.purchases_count }} {{ "purchase" if recent_spending.purchases_count == 1 else "purchases" }} · {{ "{:,}".format(recent_spending.total_amount) }} RSD
+              </p>
+              <div class="recent-spending-months">
+                {% for month in recent_spending.months %}
+                  <section class="recent-spending-month">
+                    <h3>{{ month.label }}</h3>
+                    <div class="recent-spending-list">
+                      {% for purchase in month.purchases %}
+                        <p>
+                          <span>{{ purchase.expense_name.upper() }}</span>
+                          <strong>{{ "{:,}".format(purchase.amount) }} RSD</strong>
+                        </p>
+                      {% endfor %}
+                    </div>
+                  </section>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="insight-placeholder">No significant purchases in the last 3 months.</p>
+            {% endif %}
+          </div>
+        </details>
       </section>
     </main>
 

@@ -8,11 +8,28 @@ const deleteDialogError = deleteDialog.querySelector(".delete-dialog-error");
 const historyDialog = document.querySelector("[data-history-dialog]");
 const historyBackdrop = document.querySelector("[data-history-backdrop]");
 const insightsSection = document.querySelector("[data-insights-section]");
+const recentSpendingSection = document.querySelector("[data-recent-spending-section]");
 const insightsStorageKey = "long-term-savings:insights-expanded";
+const recentSpendingStorageKey = "monthly-spending:recent-spending-expanded";
 const sectionStorageKey = "finpillow:active-section";
 const sectionTabs = [...document.querySelectorAll("[data-section-tab]")];
 const sectionContents = [...document.querySelectorAll("[data-section-content]")];
 let pendingDeleteButton = null;
+
+function persistDetailsState(details, storageKey) {
+  try {
+    details.open = window.localStorage.getItem(storageKey) === "true";
+  } catch {
+    // Local UI preferences are optional when storage is unavailable.
+  }
+  details.addEventListener("toggle", () => {
+    try {
+      window.localStorage.setItem(storageKey, String(details.open));
+    } catch {
+      // Ignore restricted or unavailable local storage.
+    }
+  });
+}
 
 function setActiveSection(section) {
   for (const tab of sectionTabs) {
@@ -51,18 +68,11 @@ if (sectionTabs.length) {
 }
 
 if (insightsSection) {
-  try {
-    insightsSection.open = window.localStorage.getItem(insightsStorageKey) === "true";
-  } catch {
-    // Local UI preferences are optional when storage is unavailable.
-  }
-  insightsSection.addEventListener("toggle", () => {
-    try {
-      window.localStorage.setItem(insightsStorageKey, String(insightsSection.open));
-    } catch {
-      // Ignore restricted or unavailable local storage.
-    }
-  });
+  persistDetailsState(insightsSection, insightsStorageKey);
+}
+
+if (recentSpendingSection) {
+  persistDetailsState(recentSpendingSection, recentSpendingStorageKey);
 }
 let closeSalaryEditor = null;
 let closeUsernameEditor = null;

@@ -1732,6 +1732,68 @@ h1 {
   padding-top: 1rem;
 }
 
+.recent-spending-section {
+  margin-top: 3rem;
+}
+
+.recent-spending-content {
+  padding-top: 1.05rem;
+}
+
+.recent-spending-total {
+  margin: 0 0 1.05rem;
+  color: var(--secondary-text);
+  font-size: 0.78rem;
+}
+
+.recent-spending-months {
+  display: grid;
+  gap: 1.15rem;
+}
+
+.recent-spending-month h3 {
+  margin: 0 0 0.35rem;
+  color: var(--secondary-text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.recent-spending-list {
+  border-top: 1px solid var(--display-border);
+}
+
+.recent-spending-list p {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+  border-bottom: 1px solid var(--display-border);
+  padding: 0.5rem 0;
+}
+
+.recent-spending-list p:last-child {
+  border-bottom: 0;
+}
+
+.recent-spending-list span {
+  overflow: hidden;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.recent-spending-list strong {
+  flex: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .insight-card {
   width: 100%;
   border: 1px solid var(--border);

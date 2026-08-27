@@ -11,6 +11,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from src import database
 from src.database import Base
 
+SIGNIFICANT_SPENDING_THRESHOLD = 5_000
+
 if TYPE_CHECKING:
     from src.orm.user import User
 
@@ -273,6 +275,29 @@ class ActualSpending(Base):
             return list(
                 session.scalars(
                     select(cls).where(cls.user_id == user_id).order_by(cls.spent_at.desc(), cls.id.desc())
+                ).all()
+            )
+
+    @classmethod
+    def significant_planned_for_months(
+        cls,
+        user_id: int,
+        month_keys: list[str],
+        threshold: int = SIGNIFICANT_SPENDING_THRESHOLD,
+    ) -> list[Self]:
+        if not month_keys:
+            return []
+        with database.SessionLocal() as session:
+            return list(
+                session.scalars(
+                    select(cls)
+                    .where(
+                        cls.user_id == user_id,
+                        cls.source_type == SpendingSourceType.PLANNED,
+                        cls.month_key.in_(month_keys),
+                        cls.amount >= threshold,
+                    )
+                    .order_by(cls.spent_at.desc(), cls.id.desc())
                 ).all()
             )
 

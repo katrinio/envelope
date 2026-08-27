@@ -18,9 +18,11 @@ from src.envelope.service import (
 from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope, EnvelopeKind
 from src.orm.spending import (
+    ActualSpending,
     PlannedSpending,
     RoutineSpending,
     RoutineSpendingSelection,
+    SIGNIFICANT_SPENDING_THRESHOLD,
     SpendingPool,
     monthly_money_state,
     spend_planned_item,
@@ -166,6 +168,19 @@ class RoutinePageItem:
     monthly_amount: int
 
 
+@dataclass(frozen=True)
+class RecentSpendingMonth:
+    label: str
+    purchases: list[ActualSpending]
+
+
+@dataclass(frozen=True)
+class RecentSpendingSummary:
+    purchases_count: int
+    total_amount: int
+    months: list[RecentSpendingMonth]
+
+
 def _get_envelope_or_404(envelope_id: int) -> Envelope:
     envelope = Envelope.get(envelope_id)
     if envelope is None:
@@ -195,6 +210,44 @@ def _envelope_status(
     return f"€{remaining_amount:,} to go"
 
 
+def _recent_month_keys(today: date) -> list[str]:
+    month_keys = []
+    year = today.year
+    month = today.month
+    for _ in range(3):
+        month_keys.append(f"{year:04d}-{month:02d}")
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    return month_keys
+
+
+def _build_recent_spending_summary(user_id: int, today: date) -> RecentSpendingSummary:
+    month_keys = _recent_month_keys(today)
+    purchases = ActualSpending.significant_planned_for_months(
+        user_id,
+        month_keys,
+        SIGNIFICANT_SPENDING_THRESHOLD,
+    )
+    purchases_by_month: dict[str, list[ActualSpending]] = {month_key: [] for month_key in month_keys}
+    for purchase in purchases:
+        purchases_by_month.setdefault(purchase.month_key, []).append(purchase)
+    months = [
+        RecentSpendingMonth(
+            label=month_name[int(month_key[-2:])].upper(),
+            purchases=purchases_by_month[month_key],
+        )
+        for month_key in month_keys
+        if purchases_by_month.get(month_key)
+    ]
+    return RecentSpendingSummary(
+        purchases_count=len(purchases),
+        total_amount=sum(purchase.amount for purchase in purchases),
+        months=months,
+    )
+
+
 def _render_envelope_page(
     request: Request,
     user: User,
@@ -213,8 +266,10 @@ def _render_envelope_page(
     envelopes = Envelope.for_user(user.id)
     spending_pool = SpendingPool.for_user(user.id)
     planned_spending = PlannedSpending.for_user(user.id)
-    current_spending_month = date.today().strftime("%Y-%m")
+    today = date.today()
+    current_spending_month = today.strftime("%Y-%m")
     spending_state = monthly_money_state(user.id, current_spending_month)
+    recent_spending = _build_recent_spending_summary(user.id, today)
     routine_spending = RoutineSpending.for_user(user.id)
     routine_selections = RoutineSpendingSelection.for_month(
         [routine.id for routine in routine_spending],
@@ -321,6 +376,7 @@ def _render_envelope_page(
             "planned_spending": planned_spending,
             "spending_form": spending_form,
             "current_spending_month": current_spending_month,
+            "recent_spending": recent_spending,
             "has_financial_pillow": any(envelope.is_financial_pillow for envelope in envelopes),
             "financial_pillow_target": (
                 calculate_financial_pillow_target(
