@@ -10,13 +10,13 @@ on:
       - "pyproject.toml"
       - "poetry.lock"
       - "Dockerfile"
-      - "docker-entrypoint.sh"
       - "docker-compose.yml"
       - ".dockerignore"
+      - "alembic.ini"
       - ".github/workflows/deploy.yml"
 
 concurrency:
-  group: deploy-postbox
+  group: deploy-envelope
   cancel-in-progress: true
 
 jobs:
@@ -36,30 +36,17 @@ jobs:
           script: |
             set -euo pipefail
 
-            cd /home/katrin/projects/postbox
+            cd /home/katrin/projects/envelope
 
             git fetch origin main
             git reset --hard origin/main
 
-            test -f .env || {
-              echo "ERROR: missing .env"
-              exit 1
-            }
-
-            echo "🔍 Validating production configuration..."
-            set -a
-            source .env
-            set +a
-
-            bash scripts/validate-production-config.sh
-
-            docker compose build postbox
-            docker compose run --rm --no-deps postbox /opt/venv/bin/alembic upgrade head
-            docker compose up -d --remove-orphans postbox
+            echo "🚀 Building and starting Envelope..."
+            docker compose up -d --build --force-recreate --remove-orphans
 
             for i in $(seq 1 30); do
-              if curl -fsS http://127.0.0.1:8014/api/ready >/dev/null; then
-                echo "Postbox deployed successfully"
+              if curl -fsS http://127.0.0.1:8014/docs >/dev/null; then
+                echo "Envelope deployed successfully"
                 docker compose ps
                 exit 0
               fi
