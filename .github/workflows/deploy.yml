@@ -1,0 +1,60 @@
+name: 🚀 Deploy Envelope
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "migrations/**"
+      - "pyproject.toml"
+      - "poetry.lock"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".dockerignore"
+      - "alembic.ini"
+      - ".github/workflows/deploy.yml"
+
+concurrency:
+  group: deploy-envelope
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || '22' }}
+          timeout: 60s
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+
+            cd /home/katrin/projects/envelope
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "🚀 Building and starting Envelope..."
+            docker compose up -d --build --force-recreate --remove-orphans
+
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:8014/docs >/dev/null; then
+                echo "Envelope deployed successfully"
+                docker compose ps
+                exit 0
+              fi
+
+              sleep 2
+            done
+
+            echo "ERROR: health check failed"
+            docker compose ps
+            docker compose logs --tail=100
+            exit 1

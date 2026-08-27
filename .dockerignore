@@ -1,0 +1,18 @@
+# Локальные артефакты разработки не нужны в образе
+.git
+.gitignore
+.venv
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.coverage
+
+# База и результаты сборки создаются отдельно
+data
+dist
+
+# Тесты и документация не требуются приложению во время запуска
+tests
+docs
+__pycache__
+*.py[cod]

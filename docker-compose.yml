@@ -1,0 +1,36 @@
+services:
+  envelope-migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: sqlite:////data/envelope.db
+    volumes:
+      - envelope_data:/data
+    restart: "no"
+
+  envelope:
+    build: .
+    depends_on:
+      envelope-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8014:8000"
+    environment:
+      DATABASE_URL: sqlite:////data/envelope.db
+    volumes:
+      - envelope_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8000/docs >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  envelope_data:
