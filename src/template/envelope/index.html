@@ -101,9 +101,18 @@
         </div>
       </header>
 
-      <section class="envelope-grid" aria-label="Savings envelopes">
+      <section
+        class="envelope-grid"
+        aria-label="Savings envelopes"
+        data-envelope-grid
+        data-order-url="{{ url_for('reorder_user_envelopes', user_id=user.id) }}"
+      >
         {% for item in envelope_items %}
-          <article class="envelope-device">
+          <article
+            class="envelope-device"
+            draggable="true"
+            data-envelope-id="{{ item.envelope.id }}"
+          >
             {% if editing_envelope_id == item.envelope.id %}
               <div class="device-screen configuration-screen">
                 <p class="configuration-title">Edit envelope</p>

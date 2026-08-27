@@ -54,6 +54,10 @@ class SalaryUpdate(BaseModel):
     salary: Annotated[int, Field(gt=0)]
 
 
+class EnvelopeOrderUpdate(BaseModel):
+    envelope_ids: list[int]
+
+
 class SalaryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -307,6 +311,19 @@ def get_user_envelopes(user_id: int) -> list[Envelope]:
     if User.get(user_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return Envelope.for_user(user_id)
+
+
+@router.patch("/users/{user_id}/envelopes/order", response_model=list[EnvelopeResponse])
+def reorder_user_envelopes(user_id: int, payload: EnvelopeOrderUpdate) -> list[Envelope]:
+    if User.get(user_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    try:
+        return Envelope.reorder_for_user(user_id, payload.envelope_ids)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
 
 
 @router.get("/envelopes/{envelope_id}", response_model=EnvelopeResponse)

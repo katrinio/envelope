@@ -69,6 +69,38 @@ def test_envelope_crud(client: TestClient) -> None:
     assert list_after_delete_response.json() == []
 
 
+def test_envelopes_can_be_reordered_and_order_persists(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    first = Envelope.create(user_id=user.id, name="First", target_amount=100, priority=1)
+    second = Envelope.create(user_id=user.id, name="Second", target_amount=100, priority=2)
+    third = Envelope.create(user_id=user.id, name="Third", target_amount=100, priority=3)
+
+    response = client.patch(
+        f"/users/{user.id}/envelopes/order",
+        json={"envelope_ids": [third.id, first.id, second.id]},
+    )
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()] == [third.id, first.id, second.id]
+    assert [item.name for item in Envelope.for_user(user.id)] == ["Third", "First", "Second"]
+    page = client.get(f"/users/{user.id}/envelopes/page")
+    assert page.text.index(f'data-envelope-id="{third.id}"') < page.text.index(
+        f'data-envelope-id="{first.id}"'
+    )
+
+
+def test_reorder_rejects_unknown_or_duplicate_envelopes(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    envelope = Envelope.create(user_id=user.id, name="First", target_amount=100, priority=1)
+
+    response = client.patch(
+        f"/users/{user.id}/envelopes/order",
+        json={"envelope_ids": [envelope.id, envelope.id]},
+    )
+
+    assert response.status_code == 422
+
+
 @pytest.mark.parametrize(
     "payload",
     [
