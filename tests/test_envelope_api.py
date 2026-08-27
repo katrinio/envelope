@@ -570,6 +570,31 @@ def test_refactored_static_modules_are_reachable(client: TestClient) -> None:
     assert all(client.get(path).status_code == 200 for path in paths)
 
 
+def test_pwa_manifest_and_icons_are_served_as_assets(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    page = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert page.status_code == 200
+    assert "/static/icons/favicon.svg" in page.text
+    assert "/static/icons/apple-touch-icon.png" in page.text
+    assert "/static/manifest.webmanifest" in page.text
+    assert client.get("/static/manifest.webmanifest").headers["content-type"].startswith(
+        "application/manifest+json"
+    )
+    for icon in (
+        "favicon.ico",
+        "favicon.svg",
+        "apple-touch-icon.png",
+        "icon-192x192.png",
+        "icon-512x512.png",
+        "icon-maskable-192x192.png",
+        "icon-maskable-512x512.png",
+    ):
+        response = client.get(f"/static/icons/{icon}")
+        assert response.status_code == 200
+        assert not response.headers["content-type"].startswith("text/html")
+
+
 def test_username_is_lowercase_and_has_inline_editor(client: TestClient) -> None:
     user = User.create(userId=1, username="Alice Smith", salary=100_000)
 

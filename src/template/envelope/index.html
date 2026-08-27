@@ -3,6 +3,11 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#F1EEE4">
+    <link rel="icon" href="{{ url_for('static', path='/icons/favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ url_for('static', path='/icons/favicon.ico') }}" sizes="any">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', path='/icons/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ url_for('static', path='/manifest.webmanifest') }}">
     <title>{{ user.username }} · Savings envelopes</title>
     <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=20260827-1">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/base.css') }}?v=20260827-1">
