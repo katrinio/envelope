@@ -4,10 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=attention-insight-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=transaction-history-1">
     <script src="{{ url_for('static', path='/envelope.js') }}?v=envelope-delete-dialog-1" defer></script>
   </head>
   <body>
+    {% if history_envelope_id is not none %}
+      <div class="history-backdrop" data-history-backdrop aria-hidden="true"></div>
+    {% endif %}
     <main class="page-shell">
       <header class="page-header">
         <p class="eyebrow">Long-term savings</p>
@@ -160,6 +163,12 @@
                     >
                       <a
                         role="menuitem"
+                        href="{{ url_for('view_user_envelopes', user_id=user.id) }}?history_envelope_id={{ item.envelope.id }}"
+                      >
+                        History
+                      </a>
+                      <a
+                        role="menuitem"
                         href="{{ url_for('view_user_envelopes', user_id=user.id) }}?edit_envelope_id={{ item.envelope.id }}"
                       >
                         Edit
@@ -262,6 +271,118 @@
             </div>
             {% endif %}
           </article>
+          {% if history_envelope_id == item.envelope.id %}
+            <dialog
+              class="history-dialog"
+              data-history-dialog
+              data-close-url="{{ url_for('view_user_envelopes', user_id=user.id) }}"
+              open
+              aria-labelledby="history-dialog-title"
+            >
+              <div class="history-dialog-content">
+                <header class="history-dialog-header">
+                  <p class="history-dialog-title" id="history-dialog-title">
+                    {{ item.envelope.name }} — History
+                  </p>
+                  <a
+                    class="history-dialog-close"
+                    href="{{ url_for('view_user_envelopes', user_id=user.id) }}"
+                    aria-label="Close history"
+                  >
+                    <span aria-hidden="true">×</span>
+                  </a>
+                </header>
+
+                {% if history_edit_form %}
+                  <form
+                    class="history-edit-form"
+                    action="{{ url_for('edit_transaction_from_page', user_id=user.id, envelope_id=item.envelope.id, transaction_id=history_edit_form.transaction_id) }}"
+                    method="post"
+                    novalidate
+                  >
+                    <p class="history-edit-title">Edit transaction</p>
+                    <label for="history-amount">Amount</label>
+                    <div class="history-edit-amount">
+                      <span aria-hidden="true">€</span>
+                      <input
+                        id="history-amount"
+                        name="amount"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value="{{ history_edit_form.amount }}"
+                        required
+                      >
+                    </div>
+                    <label for="history-date">Date</label>
+                    <input
+                      id="history-date"
+                      name="transaction_date"
+                      type="date"
+                      value="{{ history_edit_form.transaction_date }}"
+                      required
+                    >
+                    {% if not history_edit_transaction.is_withdrawal %}
+                        <label class="history-regular-option">
+                          <input name="regular_contribution" type="hidden" value="false">
+                          <input
+                            name="regular_contribution"
+                            type="checkbox"
+                            value="true"
+                            {% if history_edit_form.is_regular %}checked{% endif %}
+                          >
+                          <span>Regular contribution</span>
+                        </label>
+                    {% endif %}
+                    {% if history_edit_form.error %}
+                      <p class="history-edit-error">{{ history_edit_form.error }}</p>
+                    {% endif %}
+                    <div class="history-edit-actions">
+                      <a href="{{ url_for('view_user_envelopes', user_id=user.id) }}?history_envelope_id={{ item.envelope.id }}">Cancel</a>
+                      <button type="submit">Save</button>
+                    </div>
+                  </form>
+                {% elif history_days %}
+                  <div class="history-list">
+                    {% for history_day in history_days %}
+                      <section class="history-day">
+                        <p class="history-day-label">{{ history_day.label }}</p>
+                        <ul>
+                          {% for transaction in history_day.transactions %}
+                            <li class="history-transaction">
+                              <div class="history-transaction-main">
+                                <span class="history-sign">{{ transaction.display_sign }}</span>
+                                <span class="history-amount">€{{ "{:,}".format(transaction.amount) }}</span>
+                                <span class="history-kind">{{ transaction.display_label }}</span>
+                              </div>
+                              <div class="history-transaction-actions">
+                                <a href="{{ url_for('view_user_envelopes', user_id=user.id) }}?history_envelope_id={{ item.envelope.id }}&edit_transaction_id={{ transaction.id }}">Edit</a>
+                                <details class="history-delete">
+                                  <summary>Delete</summary>
+                                  <div class="history-delete-confirmation">
+                                    <p>Permanently delete this transaction? This action cannot be undone.</p>
+                                    <form
+                                      action="{{ url_for('delete_transaction_from_page', user_id=user.id, envelope_id=item.envelope.id, transaction_id=transaction.id) }}"
+                                      method="post"
+                                    >
+                                      <button type="submit">Delete</button>
+                                      <a href="{{ url_for('view_user_envelopes', user_id=user.id) }}?history_envelope_id={{ item.envelope.id }}">Cancel</a>
+                                    </form>
+                                  </div>
+                                </details>
+                              </div>
+                            </li>
+                          {% endfor %}
+                        </ul>
+                      </section>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <p class="history-empty">No transactions yet.</p>
+                {% endif %}
+              </div>
+            </dialog>
+          {% endif %}
         {% endfor %}
 
         <details class="creation-device"{% if creation_form %} open{% endif %}>

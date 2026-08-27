@@ -292,7 +292,10 @@ def test_envelope_page_changes_current_amount(client: TestClient) -> None:
     decrement_response = client.post(amount_url, data={"amount": 25, "operation": "decrement"})
     assert decrement_response.status_code == 200
     assert client.get(f"/envelopes/{envelope['id']}").json()["current_amount"] == 125
-    assert len(Contribution.for_envelope(envelope["id"])) == 1
+    transactions = Contribution.for_envelope(envelope["id"])
+    assert len(transactions) == 2
+    assert transactions[1].is_withdrawal is True
+    assert transactions[1].amount == 25
 
 
 def test_add_money_shows_regular_contribution_checked_by_default(client: TestClient) -> None:
@@ -746,6 +749,7 @@ def test_envelope_edit_menu_is_rendered(client: TestClient) -> None:
     assert 'aria-label="Envelope actions"' in response.text
     assert 'role="menu"' in response.text
     assert "•••" in response.text
+    assert "History" in response.text
     assert "Edit" in response.text
     assert "Delete" in response.text
     assert f"?edit_envelope_id={envelope.id}" in response.text
@@ -762,6 +766,164 @@ def test_envelope_edit_menu_is_rendered(client: TestClient) -> None:
     assert "real money" not in script_response.text.lower()
     assert "deleteDialog.showModal()" in script_response.text
     assert 'method: "DELETE"' in script_response.text
+
+
+def test_history_panel_lists_transactions_newest_first(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Pillow",
+        current_amount=100,
+        target_amount=1_000,
+        priority=1,
+    )
+    Contribution.create(
+        envelope_id=envelope.id,
+        amount=50,
+        is_regular=True,
+        transaction_type="contribution",
+        contributed_at=datetime(2026, 7, 30, 12),
+    )
+    Contribution.create(
+        envelope_id=envelope.id,
+        amount=20,
+        is_regular=False,
+        transaction_type="contribution",
+        contributed_at=datetime(2026, 8, 20, 12),
+    )
+    Contribution.create(
+        envelope_id=envelope.id,
+        amount=20,
+        is_regular=False,
+        transaction_type="withdrawal",
+        contributed_at=datetime(2026, 8, 26, 12),
+    )
+
+    response = client.get(
+        f"/users/{user.id}/envelopes/page?history_envelope_id={envelope.id}"
+    )
+
+    assert response.status_code == 200
+    assert "Pillow — History" in response.text
+    assert "AUGUST 26" in response.text
+    assert "JULY 30" in response.text
+    assert "−" in response.text  # noqa: RUF001
+    assert "Regular contribution" in response.text
+    assert "One-time contribution" in response.text
+    assert response.text.index("AUGUST 26") < response.text.index("JULY 30")
+    assert "Edit" in response.text
+    assert "Permanently delete this transaction? This action cannot be undone." in response.text
+
+
+def test_history_modal_has_viewport_backdrop_and_close_control(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(user_id=user.id, name="Trip", target_amount=1_000, priority=1)
+
+    response = client.get(
+        f"/users/{user.id}/envelopes/page?history_envelope_id={envelope.id}"
+    )
+    stylesheet = Path("src/static/envelope.css").read_text()
+
+    assert 'data-history-backdrop aria-hidden="true"' in response.text
+    assert 'aria-label="Close history"' in response.text
+    assert "background: rgb(0 0 0 / 22%)" in stylesheet
+    assert "z-index: 1000" in stylesheet
+    assert "z-index: 1001" in stylesheet
+
+
+def test_history_cannot_be_opened_for_another_users_envelope(client: TestClient) -> None:
+    owner = User.create(userId=1, username="alice", salary=1_500)
+    other_user = User.create(userId=2, username="bob", salary=1_500)
+    envelope = Envelope.create(user_id=other_user.id, name="Private", target_amount=1_000, priority=1)
+
+    response = client.get(
+        f"/users/{owner.id}/envelopes/page?history_envelope_id={envelope.id}"
+    )
+
+    assert response.status_code == 404
+
+
+def test_history_editing_withdrawal_recalculates_balance(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=100,
+        target_amount=1_000,
+        priority=1,
+    )
+    transaction = Contribution.withdraw_from_envelope(envelope.id, 30)
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/{envelope.id}/history/{transaction.id}/edit",
+        data={"amount": "50", "transaction_date": "2026-08-26"},
+    )
+
+    assert response.status_code == 200
+    stored_envelope = Envelope.get(envelope.id)
+    stored_transaction = Contribution.get(transaction.id)
+    assert stored_envelope is not None
+    assert stored_transaction is not None
+    assert stored_envelope.current_amount == 50
+    assert stored_transaction.is_withdrawal is True
+    assert stored_transaction.is_regular is False
+
+
+def test_history_edit_recalculates_balance_and_regular_status(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=100,
+        target_amount=1_000,
+        priority=1,
+    )
+    transaction = Contribution.add_to_envelope(envelope.id, 50, is_regular=True)
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/{envelope.id}/history/{transaction.id}/edit",
+        data={
+            "amount": "40",
+            "transaction_date": "2026-07-15",
+            "regular_contribution": ["false", "false"],
+        },
+    )
+
+    assert response.status_code == 200
+    stored_envelope = Envelope.get(envelope.id)
+    stored_transaction = Contribution.get(transaction.id)
+    assert stored_envelope is not None
+    assert stored_transaction is not None
+    assert stored_envelope.current_amount == 140
+    assert stored_transaction.amount == 40
+    assert stored_transaction.is_regular is False
+    assert stored_transaction.contributed_at.date() == date(2026, 7, 15)
+
+
+def test_history_delete_recalculates_balance_and_removes_transaction(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=1_500)
+    envelope = Envelope.create(
+        user_id=user.id,
+        name="Trip",
+        current_amount=100,
+        target_amount=1_000,
+        priority=1,
+    )
+    transaction = Contribution.add_to_envelope(envelope.id, 50)
+
+    response = client.post(
+        f"/users/{user.id}/envelopes/{envelope.id}/history/{transaction.id}/delete"
+    )
+
+    assert response.status_code == 200
+    stored_envelope = Envelope.get(envelope.id)
+    assert stored_envelope is not None
+    assert stored_envelope.current_amount == 100
+    assert Contribution.get(transaction.id) is None
+    history_response = client.get(
+        f"/users/{user.id}/envelopes/page?history_envelope_id={envelope.id}"
+    )
+    assert "No transactions yet." in history_response.text
 
 
 def test_regular_envelope_name_can_be_updated(client: TestClient) -> None:
