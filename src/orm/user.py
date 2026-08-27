@@ -28,3 +28,12 @@ class User(Base):
             raise ValueError("Use an amount above 0.")
         self.salary = salary
         return self.save()
+
+    def update_username(self, username: str) -> Self:
+        normalized_username = username.strip()
+        if not normalized_username:
+            raise ValueError("Add a display name.")
+        if len(normalized_username) > 255:
+            raise ValueError("Keep the display name under 255 characters.")
+        self.username = normalized_username
+        return self.save()

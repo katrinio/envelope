@@ -1,5 +1,6 @@
 const menus = [...document.querySelectorAll(".device-menu")];
 const salaryEditor = document.querySelector("[data-salary-editor]");
+const usernameEditor = document.querySelector("[data-username-editor]");
 const deleteDialog = document.querySelector("[data-delete-dialog]");
 const deleteDialogCancel = deleteDialog.querySelector("[data-delete-cancel]");
 const deleteDialogConfirm = deleteDialog.querySelector("[data-delete-confirm]");
@@ -54,6 +55,39 @@ if (salaryEditor) {
     if (event.key === "Escape") {
       event.preventDefault();
       closeSalaryEditor();
+    }
+  });
+}
+
+if (usernameEditor) {
+  const usernameDisplay = usernameEditor.querySelector(".username-display");
+  const usernameForm = usernameEditor.querySelector(".username-form");
+  const usernameInput = usernameEditor.querySelector(".username-input");
+  const usernameCancel = usernameEditor.querySelector("[data-username-cancel]");
+
+  function openUsernameEditor() {
+    usernameDisplay.hidden = true;
+    usernameForm.hidden = false;
+    usernameInput.focus();
+    usernameInput.select();
+  }
+
+  function closeUsernameEditor() {
+    usernameInput.value = usernameEditor.dataset.currentUsername;
+    usernameInput.setAttribute("aria-invalid", "false");
+    usernameInput.removeAttribute("aria-describedby");
+    usernameEditor.querySelector(".username-error")?.remove();
+    usernameForm.hidden = true;
+    usernameDisplay.hidden = false;
+    usernameDisplay.focus();
+  }
+
+  usernameDisplay.addEventListener("click", openUsernameEditor);
+  usernameCancel.addEventListener("click", closeUsernameEditor);
+  usernameForm.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeUsernameEditor();
     }
   });
 }

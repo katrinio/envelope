@@ -115,6 +115,12 @@ class SalaryForm:
 
 
 @dataclass(frozen=True)
+class UsernameForm:
+    value: str
+    error: str
+
+
+@dataclass(frozen=True)
 class HistoryDay:
     label: str
     transactions: list[Contribution]
@@ -166,6 +172,7 @@ def _render_envelope_page(
     edit_form: EnvelopeEditForm | None = None,
     amount_form: EnvelopeAmountForm | None = None,
     salary_form: SalaryForm | None = None,
+    username_form: UsernameForm | None = None,
     history_envelope_id: int | None = None,
     history_edit_transaction: Contribution | None = None,
     history_edit_form: HistoryEditForm | None = None,
@@ -246,6 +253,7 @@ def _render_envelope_page(
             "edit_form": edit_form,
             "amount_form": amount_form,
             "salary_form": salary_form,
+            "username_form": username_form,
             "saving_insight": saving_insight,
             "goal_projections": goal_projections,
             "attention_observations": attention_observations,
@@ -505,6 +513,35 @@ def edit_salary_from_page(
         )
 
     user.update_salary(parsed_salary)
+    return RedirectResponse(
+        request.url_for("view_user_envelopes", user_id=user_id),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post(
+    "/users/{user_id}/username/edit",
+    response_class=HTMLResponse,
+    name="edit_username_from_page",
+)
+def edit_username_from_page(
+    request: Request,
+    user_id: int,
+    username: Annotated[str, Form()] = "",
+) -> Response:
+    user = User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    try:
+        user.update_username(username)
+    except ValueError as error:
+        return _render_envelope_page(
+            request,
+            user,
+            username_form=UsernameForm(value=username, error=str(error)),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
     return RedirectResponse(
         request.url_for("view_user_envelopes", user_id=user_id),
         status_code=status.HTTP_303_SEE_OTHER,

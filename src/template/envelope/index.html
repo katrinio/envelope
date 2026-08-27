@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ user.username }} · Savings envelopes</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=transaction-history-1">
+    <link rel="stylesheet" href="{{ url_for('static', path='/envelope.css') }}?v=username-editor-1">
     <script src="{{ url_for('static', path='/envelope.js') }}?v=envelope-delete-dialog-1" defer></script>
   </head>
   <body>
@@ -15,7 +15,44 @@
       <header class="page-header">
         <p class="eyebrow">Long-term savings</p>
         <div class="identity-row">
-          <h1>{{ user.username }}</h1>
+          <div
+            class="username-editor"
+            data-username-editor
+            data-current-username="{{ user.username }}"
+          >
+            <h1>
+              <button
+                class="username-display"
+                type="button"
+                aria-label="Edit display name, currently {{ user.username }}"
+                {% if username_form %}hidden{% endif %}
+              >{{ user.username|lower }}</button>
+            </h1>
+            <form
+              class="username-form"
+              action="{{ url_for('edit_username_from_page', user_id=user.id) }}"
+              method="post"
+              novalidate
+              {% if not username_form %}hidden{% endif %}
+            >
+              <input
+                class="username-input"
+                name="username"
+                type="text"
+                maxlength="255"
+                value="{{ username_form.value if username_form else user.username }}"
+                aria-label="Display name"
+                aria-invalid="{{ 'true' if username_form else 'false' }}"
+                {% if username_form %}aria-describedby="username-error" autofocus{% endif %}
+                required
+              >
+              <button class="username-save" type="submit">Save</button>
+              <button class="username-cancel" type="button" data-username-cancel>Cancel</button>
+              {% if username_form %}
+                <p class="username-error" id="username-error">{{ username_form.error }}</p>
+              {% endif %}
+            </form>
+          </div>
           <div
             class="salary-editor"
             data-salary-editor

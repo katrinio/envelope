@@ -105,6 +105,54 @@ def test_envelope_page_renders(client: TestClient) -> None:
     assert "100,000" in response.text
 
 
+def test_username_is_lowercase_and_has_inline_editor(client: TestClient) -> None:
+    user = User.create(userId=1, username="Alice Smith", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert ">alice smith</button>" in response.text
+    assert 'data-username-editor' in response.text
+    assert 'name="username"' in response.text
+    assert "data-username-cancel" in response.text
+
+
+def test_username_can_be_updated_and_cancelled(client: TestClient) -> None:
+    user = User.create(userId=1, username="Alice", salary=100_000)
+
+    update_response = client.post(
+        f"/users/{user.id}/username/edit",
+        data={"username": "Alice Cooper"},
+    )
+
+    assert update_response.status_code == 200
+    stored_user = User.get(user.id)
+    assert stored_user is not None
+    assert stored_user.username == "Alice Cooper"
+    assert ">alice cooper</button>" in update_response.text
+
+    page_response = client.get(f"/users/{user.id}/envelopes/page")
+    assert 'data-current-username="Alice Cooper"' in page_response.text
+    assert "data-username-cancel" in page_response.text
+
+
+@pytest.mark.parametrize("username", ["", "   "])
+def test_username_rejects_blank_display_name(
+    client: TestClient,
+    username: str,
+) -> None:
+    user = User.create(userId=1, username="Alice", salary=100_000)
+
+    response = client.post(
+        f"/users/{user.id}/username/edit",
+        data={"username": username},
+    )
+
+    assert response.status_code == 422
+    assert "Add a display name." in response.text
+    assert User.get(user.id).username == "Alice"  # type: ignore[union-attr]
+
+
 def test_insights_section_is_collapsed_and_contains_three_cards(client: TestClient) -> None:
     user = User.create(userId=1, username="alice", salary=100_000)
 
