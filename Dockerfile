@@ -1,7 +1,4 @@
-#   Envelope: Python-only production image
-#   FastAPI + Jinja2 on :8000
-#   Database: SQLite under /data
-#   User: postbox (non-root)
+# Envelope: FastAPI + server-rendered UI
 
 # ============================================================================
 # builder: Build Python wheel and install into a virtual environment
@@ -15,33 +12,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apt-get update && \
-    apt-get install --yes --no-install-recommends build-essential && \
-    rm -rf /var/lib/apt/lists/*
-
 RUN pip install --no-cache-dir "poetry>=2.0,<3.0"
 
 COPY pyproject.toml poetry.lock README.md ./
 COPY src ./src
 
-RUN poetry build --format wheel && \
-    wheel_file=$(ls dist/postbox-*.whl | head -1) && \
-    test -n "$wheel_file" || (echo "ERROR: No wheel produced"; exit 1)
-
-RUN python -m venv /opt/venv && \
-    /opt/venv/bin/pip install --no-cache-dir dist/postbox-*.whl
-
-RUN cd /tmp && \
-    /opt/venv/bin/python -c "import postbox; import postbox.api; assert '/opt/venv' in postbox.__file__, postbox.__file__" && \
-    test -x /opt/venv/bin/postbox-api
-
-# Verify templates and static assets are packaged
-RUN /opt/venv/bin/python -c "\
-from pathlib import Path; import postbox; \
-pkg = Path(postbox.__file__).parent; \
-assert (pkg / 'templates' / 'base.html').exists(), 'missing templates'; \
-assert (pkg / 'static' / 'css' / 'app.css').exists(), 'missing static assets'; \
-"
+RUN poetry build --format wheel \
+    && python -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir dist/python_project_template-*.whl
 
 # ============================================================================
 # runtime: Minimal production image
@@ -49,14 +27,10 @@ assert (pkg / 'static' / 'css' / 'app.css').exists(), 'missing static assets'; \
 
 FROM python:3.14-slim AS runtime
 
-# Build argument for version (e.g., git SHA or release tag)
-# Pass via: docker build --build-arg VERSION=<git-sha>
-ARG VERSION=""
-
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:${PATH}" \
-    POSTBOX_STATIC_VERSION="${VERSION}"
+    DATABASE_URL="sqlite:////data/envelope.db"
 
 WORKDIR /app
 
@@ -72,20 +46,15 @@ COPY --from=builder /opt/venv /opt/venv
 COPY migrations ./migrations
 COPY alembic.ini ./alembic.ini
 
-# Create application user and data directory
 RUN useradd \
         --create-home \
         --uid 10001 \
         --shell /usr/sbin/nologin \
-        postbox && \
+        envelope && \
     mkdir -p /data && \
-    chown -R postbox:postbox /app /data /opt/venv
+    chown -R envelope:envelope /app /data /opt/venv
 
-# Smoke check: verify runtime
-RUN command -v postbox-api && \
-    python -c "import postbox"
-
-USER postbox
+USER envelope
 
 EXPOSE 8000
 
@@ -94,6 +63,6 @@ HEALTHCHECK \
     --timeout=5s \
     --retries=3 \
     --start-period=10s \
-    CMD curl --fail --silent http://127.0.0.1:8000/api/ready || exit 1
+    CMD curl --fail --silent http://127.0.0.1:8000/docs >/dev/null || exit 1
 
-CMD ["postbox-api"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

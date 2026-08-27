@@ -1,29 +1,27 @@
 services:
-  postbox:
+  envelope-migrate:
     build: .
-    restart: unless-stopped
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: sqlite:////data/envelope.db
+    volumes:
+      - envelope_data:/data
+    restart: "no"
 
-    labels:
-      com.katrin.logs.app: "envelope"
-      com.katrin.logs.environment: "production"
-
+  envelope:
+    build: .
+    depends_on:
+      envelope-migrate:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:8014:8000"
     environment:
-      POSTBOX_DATABASE_URL: sqlite+aiosqlite:////data/postbox.db
-      POSTBOX_JWT_SECRET_KEY: ${POSTBOX_JWT_SECRET_KEY}
-      POSTBOX_REGISTRATION_LIMIT: ${POSTBOX_REGISTRATION_LIMIT:-5}
-      POSTBOX_LOG_LEVEL: ${POSTBOX_LOG_LEVEL:-INFO}
-      POSTBOX_COOKIE_SECURE: ${POSTBOX_COOKIE_SECURE:-true}
-      POSTBOX_DEV_LOGIN: ${POSTBOX_DEV_LOGIN:-false}
-      HUB_AUTH_SECRET: ${HUB_AUTH_SECRET}
-      HUB_BOT_URL: ${HUB_BOT_URL:-}
-      POSTBOX_API_HOST: 0.0.0.0
-      POSTBOX_API_RELOAD: "false"
+      DATABASE_URL: sqlite:////data/envelope.db
     volumes:
-      - ./data:/data
+      - envelope_data:/data
+    restart: unless-stopped
     healthcheck:
-      test: curl --fail --silent http://127.0.0.1:8000/api/ready
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8000/docs >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -33,3 +31,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  envelope_data:
