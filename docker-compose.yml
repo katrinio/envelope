@@ -14,7 +14,7 @@ services:
       envelope-migrate:
         condition: service_completed_successfully
     ports:
-      - "127.0.0.1:8015:8000"
+      - "127.0.0.1:${ENVELOPE_PORT:-8015}:8000"
     environment:
       DATABASE_URL: sqlite:////data/envelope.db
     volumes:
