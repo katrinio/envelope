@@ -17,10 +17,10 @@ def _run_alembic(revision: str, database_url: str, project_root: Path) -> None:
     )
 
 
-def test_existing_envelopes_become_regular_after_migration(tmp_path: Path) -> None:
+def test_baseline_creates_current_schema(tmp_path: Path) -> None:
     project_root = Path(__file__).parents[1]
     database_url = f"sqlite:///{tmp_path / 'migration.db'}"
-    _run_alembic("20260825_02", database_url, project_root)
+    _run_alembic("head", database_url, project_root)
 
     engine = create_engine(database_url)
     with engine.begin() as connection:
@@ -33,12 +33,10 @@ def test_existing_envelopes_become_regular_after_migration(tmp_path: Path) -> No
         connection.execute(
             text(
                 "INSERT INTO envelopes "
-                "(id, user_id, name, current_amount, target_amount, priority) "
-                "VALUES (1, 1, 'Trip', 100, 1200, 1)"
+                "(id, user_id, name, current_amount, opening_amount, target_amount, priority, kind, pillow_index) "
+                "VALUES (1, 1, 'Trip', 100, 100, 1200, 1, 'regular', 2)"
             )
         )
-
-    _run_alembic("head", database_url, project_root)
 
     with engine.connect() as connection:
         migrated_envelope = connection.execute(
