@@ -9,7 +9,46 @@ const historyDialog = document.querySelector("[data-history-dialog]");
 const historyBackdrop = document.querySelector("[data-history-backdrop]");
 const insightsSection = document.querySelector("[data-insights-section]");
 const insightsStorageKey = "long-term-savings:insights-expanded";
+const sectionStorageKey = "finpillow:active-section";
+const sectionTabs = [...document.querySelectorAll("[data-section-tab]")];
+const sectionContents = [...document.querySelectorAll("[data-section-content]")];
 let pendingDeleteButton = null;
+
+function setActiveSection(section) {
+  for (const tab of sectionTabs) {
+    const active = tab.dataset.sectionTab === section;
+    tab.classList.toggle("is-active", active);
+    tab.setAttribute("aria-selected", String(active));
+    tab.setAttribute("aria-current", active ? "page" : "false");
+  }
+  for (const content of sectionContents) {
+    content.hidden = content.dataset.sectionContent !== section;
+  }
+}
+
+if (sectionTabs.length) {
+  let activeSection = "savings";
+  try {
+    const savedSection = window.localStorage.getItem(sectionStorageKey);
+    if (savedSection === "spending" || savedSection === "savings") {
+      activeSection = savedSection;
+    }
+  } catch {
+    // Local UI preferences are optional when storage is unavailable.
+  }
+  setActiveSection(activeSection);
+  for (const tab of sectionTabs) {
+    tab.addEventListener("click", () => {
+      const section = tab.dataset.sectionTab;
+      setActiveSection(section);
+      try {
+        window.localStorage.setItem(sectionStorageKey, section);
+      } catch {
+        // Ignore restricted or unavailable local storage.
+      }
+    });
+  }
+}
 
 if (insightsSection) {
   try {

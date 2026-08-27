@@ -13,7 +13,10 @@
     {% endif %}
     <main class="page-shell">
       <header class="page-header">
-        <p class="eyebrow">Long-term savings</p>
+        <nav class="section-tabs" aria-label="Savings sections">
+          <button class="section-tab" type="button" data-section-tab="savings">Long-term savings</button>
+          <button class="section-tab" type="button" data-section-tab="spending">Monthly spending</button>
+        </nav>
         <div class="identity-row">
           <div
             class="username-editor"
@@ -100,6 +103,8 @@
           </div>
         </div>
       </header>
+
+      <div class="section-content" data-section-content="savings">
 
       <section
         class="envelope-grid"
@@ -603,6 +608,11 @@
           </article>
         </div>
       </details>
+      </div>
+
+      <section class="section-content monthly-spending" data-section-content="spending" hidden>
+        <span class="sr-only">Monthly spending</span>
+      </section>
     </main>
 
     <dialog

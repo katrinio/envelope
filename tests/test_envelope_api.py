@@ -138,6 +138,20 @@ def test_envelope_page_renders(client: TestClient) -> None:
     assert response.headers["cache-control"] == "no-cache"
 
 
+def test_section_tabs_render_with_monthly_spending_empty_by_default(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+
+    response = client.get(f"/users/{user.id}/envelopes/page")
+
+    assert response.status_code == 200
+    assert 'data-section-tab="savings"' in response.text
+    assert 'data-section-tab="spending"' in response.text
+    assert 'data-section-content="spending" hidden' in response.text
+    script = client.get("/static/envelope.js")
+    assert "finpillow:active-section" in script.text
+    assert "setActiveSection(activeSection)" in script.text
+
+
 def test_static_assets_use_safe_cache_policy(client: TestClient) -> None:
     versioned = client.get("/static/envelope.css?v=build-1")
     unversioned = client.get("/static/envelope.css")

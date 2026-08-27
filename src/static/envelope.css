@@ -54,6 +54,52 @@ input[type="number"]::-webkit-outer-spin-button {
   border-bottom: 1px solid var(--border);
 }
 
+.section-tabs {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 1.35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-tab {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--secondary-text);
+  background: transparent;
+  padding: 0 0 0.5rem;
+  cursor: pointer;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.section-tab.is-active {
+  border-bottom-color: var(--primary-text);
+  color: var(--primary-text);
+}
+
+.section-tab:focus-visible {
+  outline: 1px solid var(--primary-text);
+  outline-offset: 0.18rem;
+}
+
+.monthly-spending {
+  min-height: 8rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .eyebrow,
 .salary-label,
 .salary-save,
