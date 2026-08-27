@@ -130,14 +130,32 @@ input[type="number"]::-webkit-outer-spin-button {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column-reverse;
   align-items: flex-end;
 }
 
-.spending-pool-fill {
+.spending-pool-free,
+.spending-pool-planned,
+.spending-pool-spent {
   width: 100%;
-  min-height: 0.35rem;
+}
+
+.spending-pool-free {
   background: var(--segment-fill);
   opacity: 0.92;
+}
+
+.spending-pool-planned {
+  background-color: var(--display-background);
+  background-image:
+    radial-gradient(var(--display-border) 28%, transparent 30%),
+    radial-gradient(var(--display-border) 28%, transparent 30%);
+  background-position: 0 0, 0.32rem 0.32rem;
+  background-size: 0.64rem 0.64rem;
+}
+
+.spending-pool-spent {
+  background: var(--display-background);
 }
 
 .spending-pool-copy {

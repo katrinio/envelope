@@ -22,6 +22,7 @@ from src.orm.spending import (
     RoutineSpending,
     RoutineSpendingSelection,
     SpendingPool,
+    monthly_money_state,
     spend_planned_item,
     spend_routine_for_month,
 )
@@ -213,6 +214,7 @@ def _render_envelope_page(
     spending_pool = SpendingPool.for_user(user.id)
     planned_spending = PlannedSpending.for_user(user.id)
     current_spending_month = date.today().strftime("%Y-%m")
+    spending_state = monthly_money_state(user.id, current_spending_month)
     routine_spending = RoutineSpending.for_user(user.id)
     routine_selections = RoutineSpendingSelection.for_month(
         [routine.id for routine in routine_spending],
@@ -314,6 +316,7 @@ def _render_envelope_page(
             "history_edit_transaction": history_edit_transaction,
             "history_edit_form": history_edit_form,
             "spending_pool": spending_pool,
+            "spending_state": spending_state,
             "routine_items": routine_items,
             "planned_spending": planned_spending,
             "spending_form": spending_form,
@@ -493,7 +496,7 @@ def spend_planned_spending(
     if user is None or item is None or item.user_id != user_id:
         raise HTTPException(status_code=404, detail="Planned spending not found")
     try:
-        spend_planned_item(user_id, item_id)
+        spend_planned_item(user_id, item_id, date.today().strftime("%Y-%m"))
     except ValueError as error:
         return _render_envelope_page(
             request,
@@ -628,6 +631,16 @@ def update_routine_spending_selection(
     month_key = date.today().strftime("%Y-%m")
     try:
         parsed_quantity = int(quantity)
+        selections = RoutineSpendingSelection.for_month([item_id], month_key)
+        previous_amount = (
+            item.default_amount * selections[item_id].quantity
+            if item_id in selections
+            else 0
+        )
+        next_amount = item.default_amount * parsed_quantity if selected else 0
+        spending_state = monthly_money_state(user_id, month_key)
+        if next_amount > spending_state.free + previous_amount:
+            raise ValueError("Not enough free money.")
         RoutineSpendingSelection.set_for_month(
             routine_id=item_id,
             month_key=month_key,

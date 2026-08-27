@@ -2,6 +2,7 @@ from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope, EnvelopeKind
 from src.orm.spending import (
     ActualSpending,
+    MonthlySpendingCapacity,
     PlannedSpending,
     RoutineSpending,
     RoutineSpendingSelection,
@@ -14,6 +15,7 @@ __all__ = [
     "Envelope",
     "EnvelopeKind",
     "ActualSpending",
+    "MonthlySpendingCapacity",
     "PlannedSpending",
     "RoutineSpending",
     "RoutineSpendingSelection",

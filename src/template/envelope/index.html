@@ -616,11 +616,13 @@
             <p class="spending-label">AVAILABLE</p>
             <div class="spending-pool-display">
               <div class="spending-pool-scale" aria-hidden="true">
-                <div class="spending-pool-fill" style="height: {{ '100%' if spending_pool.current_amount else '0%' }}"></div>
+                <div class="spending-pool-free" style="height: {{ spending_state.free_percentage }}%"></div>
+                <div class="spending-pool-planned" style="height: {{ spending_state.planned_percentage }}%"></div>
+                <div class="spending-pool-spent" style="height: {{ spending_state.spent_percentage }}%"></div>
               </div>
               <div class="spending-pool-copy">
-                <p class="spending-pool-amount">{{ "{:,}".format(spending_pool.current_amount) }} RSD</p>
-                <p class="spending-secondary">available</p>
+                <p class="spending-pool-amount">{{ "{:,}".format(spending_state.free) }} RSD</p>
+                <p class="spending-secondary">free</p>
               </div>
             </div>
             <div class="spending-pool-controls">
@@ -675,6 +677,9 @@
                       <span>{{ item.routine.name }}</span>
                       {% if item.is_selected and item.quantity > 1 %}
                         <small>{{ item.quantity }} × {{ "{:,}".format(item.routine.default_amount) }} = {{ "{:,}".format(item.monthly_amount) }} RSD</small>
+                      {% endif %}
+                      {% if spending_form and spending_form.item_kind == 'routine-selection' and spending_form.item_id == item.routine.id and spending_form.error %}
+                        <small class="spending-error">{{ spending_form.error }}</small>
                       {% endif %}
                     </div>
                     <strong>{{ "{:,}".format(item.monthly_amount if item.is_selected else item.routine.default_amount) }} RSD</strong>

@@ -14,10 +14,12 @@ from src.orm.contribution import Contribution
 from src.orm.envelope import Envelope
 from src.orm.spending import (
     ActualSpending,
+    MonthlySpendingCapacity,
     PlannedSpending,
     RoutineSpending,
     RoutineSpendingSelection,
     SpendingPool,
+    monthly_money_state,
 )
 from src.orm.user import User
 
@@ -198,13 +200,16 @@ def test_monthly_spending_uses_rsd_layout_and_clean_sections(client: TestClient)
     spending_markup = response.text.split('data-section-content="spending"', maxsplit=1)[1]
     assert "<details" not in spending_markup
     assert 'class="spending-layout"' in response.text
-    assert 'class="spending-pool-fill"' in response.text
+    assert 'class="spending-pool-free"' in response.text
+    assert 'class="spending-pool-planned"' in response.text
+    assert 'class="spending-pool-spent"' in response.text
     assert 'data-editor-target="routine-add"' in response.text
     assert 'data-editor-target="planned-add"' in response.text
 
 
 def test_routine_spending_can_be_created_edited_selected_and_deleted(client: TestClient) -> None:
     user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(10_000, "increment")
 
     create_response = client.post(
         f"/users/{user.id}/spending/routine/create",
@@ -259,6 +264,11 @@ def test_routine_and_planned_do_not_deduct_available(client: TestClient) -> None
     )
 
     assert SpendingPool.for_user(user.id).current_amount == 50_000
+    state = monthly_money_state(user.id, date.today().strftime("%Y-%m"))
+    assert state.capacity == 50_000
+    assert state.free == 38_000
+    assert state.planned == 12_000
+    assert state.spent == 0
 
 
 def test_spending_planned_routine_deducts_available_records_history_and_resets_selection(
@@ -285,6 +295,11 @@ def test_spending_planned_routine_deducts_available_records_history_and_resets_s
     assert records[0].source_type == "routine"
     assert records[0].routine_id == routine.id
     assert records[0].planned_spending_id is None
+    state = monthly_money_state(user.id, date.today().strftime("%Y-%m"))
+    assert state.capacity == 21_000
+    assert state.free == 3_000
+    assert state.planned == 0
+    assert state.spent == 18_000
 
 
 def test_spending_planned_item_deducts_available_records_history_and_removes_item(
@@ -305,6 +320,7 @@ def test_spending_planned_item_deducts_available_records_history_and_removes_ite
     assert records[0].amount == 35_000
     assert records[0].source_type == "planned"
     assert records[0].planned_spending_id == item.id
+    assert records[0].month_key == date.today().strftime("%Y-%m")
 
 
 def test_spend_rejects_insufficient_available_without_changing_state(client: TestClient) -> None:
@@ -323,6 +339,7 @@ def test_spend_rejects_insufficient_available_without_changing_state(client: Tes
 
 def test_spend_actions_render_only_for_planned_states(client: TestClient) -> None:
     user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(10_000, "increment")
     inactive = RoutineSpending.create(user_id=user.id, name="Boxing", default_amount=12_000)
     active = RoutineSpending.create(user_id=user.id, name="Manicure", default_amount=3_000)
     PlannedSpending.create(user_id=user.id, name="Chair", amount=35_000)
@@ -338,6 +355,75 @@ def test_spend_actions_render_only_for_planned_states(client: TestClient) -> Non
     assert f'routine-spend-{inactive.id}' not in response.text
     assert "planned-spend-" in response.text
     assert "Deduct from Available?" in response.text
+
+
+def test_monthly_capacity_expands_with_additions_and_spending_does_not_rescale_free(
+    client: TestClient,
+) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    month_key = date.today().strftime("%Y-%m")
+    SpendingPool.for_user(user.id).change_amount(21_000, "increment")
+    routine = RoutineSpending.create(user_id=user.id, name="Box", default_amount=9_000)
+    client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "1"},
+    )
+    client.post(f"/users/{user.id}/spending/routine/{routine.id}/spend")
+
+    state = monthly_money_state(user.id, month_key)
+    assert state.capacity == 21_000
+    assert state.free == 12_000
+    assert state.spent == 9_000
+    page = client.get(f"/users/{user.id}/envelopes/page")
+    assert 'class="spending-pool-free" style="height: 57.14285714285714%"' in page.text
+    assert 'class="spending-pool-spent" style="height: 42.857142857142854%"' in page.text
+
+    SpendingPool.for_user(user.id).change_amount(10_000, "increment")
+
+    state = monthly_money_state(user.id, month_key)
+    assert state.capacity == 31_000
+    assert state.free == 22_000
+    assert state.spent == 9_000
+
+
+def test_routine_selection_cannot_exceed_free_money(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    SpendingPool.for_user(user.id).change_amount(10_000, "increment")
+    routine = RoutineSpending.create(user_id=user.id, name="Box", default_amount=9_000)
+
+    response = client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "2"},
+    )
+
+    assert response.status_code == 422
+    assert "Not enough free money." in response.text
+    assert RoutineSpendingSelection.for_month([routine.id], date.today().strftime("%Y-%m")) == {}
+    assert monthly_money_state(user.id, date.today().strftime("%Y-%m")).free == 10_000
+
+
+def test_available_decrement_must_leave_capacity_for_planned_and_spent(client: TestClient) -> None:
+    user = User.create(userId=1, username="alice", salary=100_000)
+    month_key = date.today().strftime("%Y-%m")
+    SpendingPool.for_user(user.id).change_amount(21_000, "increment")
+    routine = RoutineSpending.create(user_id=user.id, name="Box", default_amount=9_000)
+    client.post(
+        f"/users/{user.id}/spending/routine/{routine.id}/selection",
+        data={"selected": "1", "quantity": "1"},
+    )
+
+    response = client.post(
+        f"/users/{user.id}/spending/amount",
+        data={"operation": "decrement", "amount": "13000"},
+    )
+
+    assert response.status_code == 422
+    assert "Not enough free money." in response.text
+    state = monthly_money_state(user.id, month_key)
+    assert state.capacity == 21_000
+    assert state.free == 12_000
+    assert state.planned == 9_000
+    assert MonthlySpendingCapacity.for_user_month(user.id, month_key).capacity_amount == 21_000
 
 
 def test_planned_spending_can_be_edited_and_deleted(client: TestClient) -> None:
